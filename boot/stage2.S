@@ -149,7 +149,7 @@ _gdt:
     .long 0x00CF9200 # (1(P)00(DPL)1(S)0(E)0(D)1(RW)0(A) = 92)
 
     # long mode
-    .long 0xC0FA1580 # KOHA(RU)158(CM)
+    .long 0xC0FA1480 # KOHA(RU)148(CM)
     .long 0x00209A00 # (0(G)0(DB)1(L)0(X) = 2) (1(P)00(DPL)1(S)1(E)0(C)1(RW)0(A) = 9A)
 _gdt.end:
 
