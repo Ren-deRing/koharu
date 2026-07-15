@@ -8,6 +8,7 @@ _start:
 	xor %ax, %ax # ax is 0x00
 	mov %ax, %ds # data segment
 	mov %ax, %ss # stack segment
+    mov %ax, %es
 
     mov $0x7bf0, %sp # stack pointer
                      # stack grows downwards, so it is a 16B aligned address below 0x7c00.
@@ -87,6 +88,12 @@ hello:
 disk_error:
     .ascii "disk read error!"
     .byte 0
+
+.org 500         # fill 0 until addr reaches 500
+_shared_print:   # absolute addr: 0x7c00 + 500
+    jmp _print
+_shared_newline: # + 3
+    jmp _print.newline
 
 .fill 510 - (. - _start), 1, 0 # (510) - (curr addr) - (start addr) = how much of the 510 Bytes remains
                                # or .org 510

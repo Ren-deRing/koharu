@@ -4,6 +4,66 @@
 .global _stage2
 
 _stage2:
+    xor %ax, %ax
+    mov %ax, %ds
+    mov %ax, %es
+
+_do.mmap:
+    mov $0xE820, %eax      # let's do e820
+
+    mov $0x6000, %edi      # our mmap will be stored to this addr.
+    xor %ebx, %ebx
+    mov $0x0534D4150, %edx # signature, "SMAP"
+    movl $1, %es:20(%di)   # request ACPI 3.x+ entry
+    mov $24, %ecx          # result buffer size
+    
+    int $0x15
+    jc _panic              # carry flag set: something went wrong!
+
+    mov $0x0534D4150, %edx # if it succeeded, e820 sets edx to "SMAP" signature.
+    cmp %edx, %eax         # no "SMAP"? something went wrong!
+    jne _panic
+
+    test %ebx, %ebx        # ebx = continuation value for next entry, so 0: length 1 -> useless!
+    je _panic
+
+_get.mmap:
+    mov $0xE820, %eax      # S
+    mov $0x0534D4150, %edx # A
+    movl $1, %es:20(%di)   # M
+    mov $24, %ecx          # E
+    
+    int $0x15
+    jc _mmap.end           # carry flag set: in this time, means done.
+    mov $0x0534D4150, %edx # restoration just in case
+
+_mmap.loop:
+    jcxz _skip.entry       # jmp if cx is zero. cx = actual length returned in bytes, so 0: empty!
+    cmp $20, %cl           # if response is ACPI 3.x+?
+    jbe _no.acpi3          # oh no
+    testb $1, %es:20(%di)  # if 'ignore this data' bit set?
+    je _skip.entry
+
+_no.acpi3:
+    mov %es:8(%di), %ecx   # get lower 32bits of length
+    test %ecx, %ecx        # if length > 0?
+    jne _good.entry        # good.
+    mov %es:12(%di), %ecx  # get higher 32bits of length
+    jecxz _skip.entry      # no length? skips.
+
+_good.entry:
+    inc %bp                # got it! count++
+    add $32, %di           # pad to 32 bytes
+
+_skip.entry:
+    test %ebx, %ebx        # if ebx is 0, mmap is completed
+    jne _get.mmap
+
+_mmap.end:
+    xor %eax, %eax         # blank record
+	mov $8, %ecx
+	rep stosl
+
 _ready.protected:
     in $0x92, %al  # read system control port A
     or $2, %al     # bit 1: A20 gate enable
@@ -16,6 +76,13 @@ _ready.protected:
     mov %eax, %cr0 # write back
 
     ljmp $0x08, $_start32 # SS (RPL(2b), TI(1b), GDT IDX(13b)) so 0x08 => 0000 0000 0000 1000 (Ring 0, Use GDT, GDT Idx 1)
+
+_panic:
+    mov $mmap_panic, %si
+    call 0x7DF4 # shared _print
+    call 0x7DF7 # shared _print.newline
+
+    jmp . # hlt (panic)
 
 .code32
 _start32:          # initalize segments
@@ -122,6 +189,9 @@ _start64:
     rep stosq      # fill 8B zero to __bss_start for rcx times
 
 _call.c:
+    and $0xFFFFFFFFFFFFFFF0, %rsp
+    sub $8, %rsp # 16-Byte alignment (call pushes 8B return address)
+
     .extern loader_entry
     call loader_entry
 
@@ -156,3 +226,7 @@ _gdt.end:
 _gdtr:
     .word (_gdt.end - _gdt) - 1 # GDT is always bigger than 1 Byte.
     .long _gdt                  # GDT's addr
+
+mmap_panic:
+    .ascii "mmap panic!"
+    .byte 0
