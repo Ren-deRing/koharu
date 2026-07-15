@@ -1,6 +1,6 @@
-ENTRY(_enter)
+ENTRY(_stage2)
 load = 0x8000;
-phys = 0x0;
+phys = 0x8000;
 SECTIONS
 {
 	.text load : AT(phys)
@@ -10,9 +10,17 @@ SECTIONS
         *(.rodata)
 		. = ALIGN(4);
 	}
+	.bss : AT(ADDR(.bss))
+    {
+		. = ALIGN(8);
+		__bss_start = .;
+        *(COMMON)
+        *(.bss)
+		. = ALIGN(8);
+		__bss_end = .;
+    }
 	/DISCARD/ :
 	{
-		*(.bss)
 		*(.comment)
 		*(.eh_frame)
 		*(.note.gnu.build-id)

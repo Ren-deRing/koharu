@@ -1,6 +1,6 @@
 ENTRY(_start)
 load = 0x7c00;
-phys = 0x0;
+phys = 0x7c00;
 SECTIONS
 {
 	.text load : AT(phys)

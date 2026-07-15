@@ -24,7 +24,7 @@ _load:
     mov $0x8000, %bx # and pointer is 8000.
 
     mov $0x02, %ah  # read sectors
-    mov $0x08, %al  # how many?
+    mov $0x10, %al  # how many?
     mov $0x00, %ch  # where?   (cylinder)
     mov $0x02, %cl  # where??  (sector)
     mov $0x00, %dh  # where??? (head)
