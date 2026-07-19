@@ -9,27 +9,74 @@
 #include "font.h"
 
 typedef struct {
-    uint32_t magic;  // 0x36, 0x04, 0x03, 0x10
+    uint16_t magic;  // 0x36, 0x04, 0x03, 0x10
     uint8_t  mode;
     uint8_t  char_height;
-} __attribute__((packed)) psf_header_t;
+} __attribute__((packed)) psf1_header_t;
 
-volatile uint32_t *fb;
-uint16_t screen_pitch;
+typedef struct {
+    uint16_t width;
+    uint16_t height;
+    uint16_t pitch; // bytes per scanline
+    uint32_t* fb;
+} __attribute__((packed)) vbe_screen;
 
-void putc(char c, int x, int y, uint32_t fg) { // prototype. will be fixed.
+vbe_screen screen;
+psf1_header_t font_attribute;
+
+void putc(char c, int x, int y, uint32_t fg) {
     uintptr_t font_addr = (0xFFFF800000000000ULL + (uintptr_t)font);
-    
-    psf_header_t *header = (psf_header_t *)font_addr;
-    uint8_t *glyph = (uint8_t *)font_addr + 4 + (c * 16);
+    uint8_t *glyph = (uint8_t *)font_addr + sizeof(psf1_header_t) + (c * font_attribute.char_height);
 
-    for (int cy = 0; cy < 16; cy++) {
+    for (int cy = 0; cy < font_attribute.char_height; cy++) {
         uint8_t line = glyph[cy];
         for (int cx = 0; cx < 8; cx++) {
             if (line & (0x80 >> cx)) {
-                uint32_t fb_index = (y + cy) * (screen_pitch / 4) + (x + cx);
-                fb[fb_index] = fg;
+                uint32_t fb_index = (y + cy) * (screen.pitch / 4) + (x + cx);
+                screen.fb[fb_index] = fg;
             }
+        }
+    }
+}
+
+int x = 0;
+int max_x;
+int y = 0;
+int max_y;
+
+void dprintf(char const * fmt, ...) {
+    volatile uint16_t* video_mem = (volatile uint16_t *)0xB8000; // VGA text buffer
+    uint16_t color = 0x0F; // black bg & white text
+
+    char buffer[256]; // i don't care about 256+
+    va_list ap; // variable parameters
+    va_start(ap, fmt); // get parameters!
+
+    npf_vsnprintf(buffer, sizeof(buffer), fmt, ap); // help me, nanoprintf!
+
+    va_end(ap); // no longer needed.
+
+    // offset = ( y * 80 + x ) * 2, because max_x = 80
+    for (int i = 0; buffer[i] != '\0'; i++) {
+        if (buffer[i] == '\n') { // Newline
+            x = 0; // CF
+            y++;   // LF
+        } else {
+            putc(buffer[i], 9*x, (font_attribute.char_height+1)*y, 0xFFFFFFFF); // hard-coded wow
+            x++; // VGA text mode basically reads character data from the VGA text buffer and displays.
+            
+            if (x >= max_x) { // no off-screen
+                x = 0;
+                y++;
+            }
+        }
+
+        if (y >= max_y) {
+            uintptr_t src_addr = (uintptr_t)screen.fb + (screen.pitch * (font_attribute.char_height + 1));
+            int lastline_offset = (screen.pitch * ((max_y - 1) * (font_attribute.char_height + 1)));
+            memmove((void *)screen.fb, (const void *)src_addr, lastline_offset); // shift the text data up!
+            memset((void *)(uintptr_t)screen.fb + lastline_offset, 0, (screen.pitch * (font_attribute.char_height + 1))); // clear last line
+            y = max_y - 1;
         }
     }
 }
@@ -62,26 +109,30 @@ void loader_entry() {
 
     uint64_t vbe_lfb_addr = (uint64_t)*(uint32_t *)(vbe_base + 40);
 
-    uint16_t screen_width  = (int)*(uint16_t *)(vbe_base + 18);
-    uint16_t screen_height = (int)*(uint16_t *)(vbe_base + 20);
-    screen_pitch = *(uint16_t *)(vbe_base + 16);
+    screen.fb = (uint32_t *)(0xFFFF800000000000ULL + vbe_lfb_addr);
+    screen.width = (uint16_t)*(uint16_t *)(vbe_base + 18);
+    screen.height = (uint16_t)*(uint16_t *)(vbe_base + 20);
+    screen.pitch = (uint16_t)*(uint16_t *)(vbe_base + 16);
 
-    uint64_t vbe_lfb_end = (uint64_t)vbe_lfb_addr + ((uint64_t)screen_pitch * screen_height);
+    uint64_t vbe_lfb_end = (uint64_t)vbe_lfb_addr + ((uint64_t)screen.width * screen.height);
 
     extern void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end);
     init_hhdm(get_total_ram(), vbe_lfb_end);
 
-    fb = (volatile uint32_t *)(0xFFFF800000000000ULL + vbe_lfb_addr);
-    uint32_t total_pixels  = (uint32_t)screen_width * screen_height;
+    font_attribute.char_height = *(uint8_t *)((0xFFFF800000000000ULL + (uintptr_t)font) + 3);
+    max_x = screen.width / 9; // idk this is clean... i'll fix someday... maybe?
+    max_y = screen.height / (font_attribute.char_height + 1);
 
-    putc('k', 100, 100, 0xFFFFFFFF);
-    putc('i', 110, 100, 0xFFFFFFFF);
-    putc('n', 120, 100, 0xFFFFFFFF);
-    putc('i', 130, 100, 0xFFFFFFFF);
-    putc('t', 140, 100, 0xFFFFFFFF);
-    putc('1', 150, 100, 0xFFFFFFFF);
-    putc('4', 160, 100, 0xFFFFFFFF);
-    putc('8', 170, 100, 0xFFFFFFFF);
-
+    dprintf("kinit148\nHello!................\n");
+    dprintf("font height: %d\n", font_attribute.char_height);
+    dprintf("font height: %d\n", font_attribute.char_height);
+    dprintf("font height: %d\n", font_attribute.char_height);
+    dprintf("font height: %d\n", font_attribute.char_height);
+    dprintf("font height: %d\n", font_attribute.char_height);
+    for (int i = 0; i < 262; i++) {
+        dprintf("................");
+    }
+    dprintf("\nlast line");
+    
     for (;;) asm __volatile__ ("hlt");
 }
