@@ -22,7 +22,7 @@ _start:
 _load:
     mov $0x00, %ax
     mov %ax, %es     # segment is 0..
-    mov $0x8000, %bx # and pointer is 8000.
+    mov $0x9000, %bx # and pointer is 9000.
 
     mov $0x02, %ah  # read sectors
     mov $0x20, %al  # how many?
@@ -36,7 +36,7 @@ _load:
     jc _error.disk # if carry flag set (error), jump to error
 
 _jmp.stage2:
-    ljmp $0, $0x8000 # see ya! (ljmp instead of jmp, because ljmp resets CS)
+    ljmp $0, $0x9000 # see ya! (ljmp instead of jmp, because ljmp resets CS)
 
 _error.disk:
     mov $disk_error, %si # what to print (disk error msg)

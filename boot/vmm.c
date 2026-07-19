@@ -36,7 +36,7 @@ void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end) {
 
     uint64_t *early_old_pml4t = (uint64_t *)0x1000;
     early_pml4t[0] = early_old_pml4t[0]; // i don't want to die (this bootloader is running on 0x8000 area,
-                             // which is covered by old page tables.)
+                                         // which is covered by old page tables.)
 
     early_pml4t[256] = (PT_ADDR_MASK & EARLY_PDPT_ADDR) | (PT_PRESENT | PT_WRITABLE); // 0xFFFF800000000000 is covered by PML4T's 256th child
 
@@ -72,24 +72,23 @@ void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end) {
 
     uint64_t *pml4t = (uint64_t *)PAGE_DEFAULT_ADDR;
     uint64_t *pdpt = (uint64_t *)pdpt_base_virt;
-    uint64_t *pdt = (uint64_t *)pdt_base_virt;
 
     memset((void *)PAGE_DEFAULT_ADDR, 0, (1 + total_pdpts + total_pdts) * 4096); // clear page table area.
 
     uint64_t *old_pml4t = (uint64_t *)0x1000;
     pml4t[0] = old_pml4t[0];
 
-    for (int i = 0; i < total_pdpts; i++) { // we already calculated!
+    for (uint64_t i = 0; i < total_pdpts; i++) { // we already calculated!
         pml4t[256+i] = (PT_ADDR_MASK & (pdpt_base_phys + (0x1000ULL * i))) | (PT_PRESENT | PT_WRITABLE);
     }
 
-    for (int i = 0; i < total_pdts; i++) {
+    for (uint64_t i = 0; i < total_pdts; i++) {
         pdpt[i] = (PT_ADDR_MASK & (pdt_base_phys + (0x1000ULL * i))) | (PT_PRESENT | PT_WRITABLE);
     }
 
-    for (int i = 0; i < total_pdes; i++) {
-        int pdt_index = i / 512;
-        int entry_index = i % 512;
+    for (uint64_t i = 0; i < total_pdes; i++) {
+        uint64_t pdt_index = i / 512;
+        uint64_t entry_index = i % 512;
 
         uint64_t *curr_pdt = (uint64_t *)(pdt_base_virt + (pdt_index * 0x1000ULL));
         curr_pdt[entry_index] = (PT_ADDR_MASK & (0x200000ULL * i)) | (PT_PRESENT | PT_WRITABLE | PT_HUGE);

@@ -129,8 +129,8 @@ _start32:          # initalize segments
     mov %ax, %fs
     mov %ax, %gs
 
-    mov $0xFFFE, %esp
-    mov $0xFFFE, %ebp
+    mov $0x7BF0, %esp
+    mov $0x7BF0, %ebp
 
 .equ PML4T_ADDR, 0x1000
 .equ PDPT_ADDR, 0x2000
@@ -205,8 +205,8 @@ _start64:
     mov %ax, %fs
     mov %ax, %gs
 
-    mov $0x1FFFF0, %rsp
-    mov $0x1FFFF0, %rbp
+    mov $0x7C00, %rsp
+    mov $0x7C00, %rbp
 
     .extern __bss_start
     .extern __bss_end

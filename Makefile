@@ -43,4 +43,4 @@ disk.img: boot.bin bootloader.bin
 all: disk.img
 
 run: all
-	qemu-system-x86_64 disk.img
+	qemu-system-x86_64 disk.img -m 8G

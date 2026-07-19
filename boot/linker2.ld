@@ -6,8 +6,8 @@ PHDRS
 }
 
 ENTRY(_stage2)
-load = 0x8000;
-phys = 0x8000;
+load = 0x9000;
+phys = 0x9000;
 
 SECTIONS
 {
