@@ -6,52 +6,49 @@
 #define NANOPRINTF_IMPLEMENTATION
 #include "nanoprintf.h"
 
-int x = 0;
-int y = 0;
+typedef struct {
+    uint64_t base_addr;     // memory addr
+    uint64_t length;        // memory area length
+    uint32_t type;          // 0: Good, 1: Reserved, 2: ACPI reclaimable. 3: ACPI NVS, 4: Containing bad memory
+    uint32_t acpi_ext_attr; // acpi 3.0+
+    uint64_t padding;
+} __attribute__((packed)) mmap_entry_t;
 
-void dprintf(char const * fmt, ...) {
-    volatile uint16_t* video_mem = (volatile uint16_t *)0xB8000; // VGA text buffer
-    uint16_t color = 0x0F; // black bg & white text
+uint64_t get_total_ram(void) {
+    volatile mmap_entry_t* mmap_array = (volatile mmap_entry_t*)(uintptr_t)0x8000;
+    uint64_t addr_end = 0;
 
-    char buffer[256]; // i don't care about 256+
-    va_list ap; // variable parameters
-    va_start(ap, fmt); // get parameters!
-
-    npf_vsnprintf(buffer, sizeof(buffer), fmt, ap); // help me, nanoprintf!
-
-    va_end(ap); // no longer needed.
-
-    // offset = ( y * 80 + x ) * 2, because max_x = 80
-    for (int i = 0; buffer[i] != '\0'; i++) {
-        if (buffer[i] == '\n') { // Newline
-            x = 0; // CF
-            y++;   // LF
-        } else {
-            video_mem[y * 80 + x] = (color << 8) | (uint16_t)buffer[i];
-            x++; // VGA text mode basically reads character data from the VGA text buffer and displays.
-            
-            if (x >= 80) { // no off-screen
-                x = 0;
-                y++;
-            }
+    while (mmap_array->base_addr != 0 || mmap_array->length != 0) {
+        uint64_t end_addr = mmap_array->base_addr + mmap_array->length;
+        
+        if (end_addr > addr_end) {
+            addr_end = end_addr;
         }
-
-        if (y >= 25) {
-            memmove((void *)video_mem, (const void *)(video_mem + 80), (80 * 2 * 24)); // shift the text data up!
-            memset((void *)(video_mem + (80 * 24)), 0, (80 * 2)); // clear last line
-            y = 24;
-        }
+        mmap_array++;
     }
+    return addr_end;
 }
 
 void loader_entry() {
-    memset((void *)0xB8000, 0, (80 * 2 * 25));
-    dprintf("Hello from Bootloader!\n");
+    uint8_t *vbe_base = (uint8_t *)0x5F00;
 
-    extern void init_hhdm(void);
-    init_hhdm();
+    uint64_t vbe_lfb_addr = (uint64_t)*(uint32_t *)(vbe_base + 40);
 
-    dprintf("After HHDM!\n");
+    uint16_t screen_width  = (int)*(uint16_t *)(vbe_base + 18);
+    uint16_t screen_height = (int)*(uint16_t *)(vbe_base + 20);
+    uint16_t screen_pitch    = *(uint16_t *)(vbe_base + 16);
 
-    for (;;);
+    uint64_t vbe_lfb_end = (uint64_t)vbe_lfb_addr + ((uint64_t)screen_pitch * screen_height);
+
+    extern void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end);
+    init_hhdm(get_total_ram(), vbe_lfb_end);
+
+    volatile uint32_t *fb = (volatile uint32_t *)(0xFFFF800000000000ULL + vbe_lfb_addr);
+    uint32_t total_pixels  = (uint32_t)screen_width * screen_height;
+
+    for (uint32_t i = 0; i < total_pixels; i++) {
+        fb[i] = 0x00A8FF; 
+    }
+
+    for (;;) asm __volatile__ ("hlt");
 }
