@@ -11,7 +11,7 @@ _stage2:
 _do.mmap:
     mov $0xE820, %eax      # let's do e820
 
-    mov $0x8000, %edi      # our mmap will be stored to this addr.
+    mov $0x8000, %edi      # our mmap will be stored to this addr.   TODO: HEY THIS CODE MIGHT EVEN CORRUPT MYSELF
     xor %ebx, %ebx
     mov $0x0534D4150, %edx # signature, "SMAP"
     movl $1, %es:20(%di)   # request ACPI 3.x+ entry
