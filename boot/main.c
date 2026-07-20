@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #include <string.h>
 
@@ -75,7 +76,7 @@ void dprintf(char const * fmt, ...) {
             uintptr_t src_addr = (uintptr_t)screen.fb + (screen.pitch * (font_attribute.char_height + 1));
             int lastline_offset = (screen.pitch * ((max_y - 1) * (font_attribute.char_height + 1)));
             memmove((void *)screen.fb, (const void *)src_addr, lastline_offset); // shift the text data up!
-            memset((void *)(uintptr_t)screen.fb + lastline_offset, 0, (screen.pitch * (font_attribute.char_height + 1))); // clear last line
+            memset((void*)((uintptr_t)screen.fb + lastline_offset), 0, (size_t)screen.pitch * (font_attribute.char_height + 1)); // clear last line
             y = max_y - 1;
         }
     }
@@ -89,19 +90,29 @@ typedef struct {
     uint64_t padding;
 } __attribute__((packed)) mmap_entry_t;
 
-uint64_t get_total_ram(void) {
+uint64_t get_mem_size(bool is_total) {
     volatile mmap_entry_t* mmap_array = (volatile mmap_entry_t*)(uintptr_t)0x8000;
-    uint64_t addr_end = 0;
+    uint64_t total_size = 0;
+    uint64_t max_addr = 0;
 
     while (mmap_array->base_addr != 0 || mmap_array->length != 0) {
         uint64_t end_addr = mmap_array->base_addr + mmap_array->length;
         
-        if (end_addr > addr_end) {
-            addr_end = end_addr;
+        if (mmap_array->type == 1 || is_total) {
+            if (end_addr > max_addr) {
+                max_addr = end_addr;
+            }
+            total_size += mmap_array->length; 
         }
         mmap_array++;
     }
-    return addr_end;
+    
+    return is_total ? max_addr : total_size; 
+}
+
+void hlt(void) {
+    dprintf("\nhalted.");
+    for (;;) asm __volatile__ ("hlt");
 }
 
 void loader_entry() {
@@ -114,25 +125,35 @@ void loader_entry() {
     screen.height = (uint16_t)*(uint16_t *)(vbe_base + 20);
     screen.pitch = (uint16_t)*(uint16_t *)(vbe_base + 16);
 
-    uint64_t vbe_lfb_end = (uint64_t)vbe_lfb_addr + ((uint64_t)screen.width * screen.height);
+    uint64_t vbe_lfb_end = (uint64_t)vbe_lfb_addr + ((uint64_t)screen.pitch * screen.height);
 
     extern void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end);
-    init_hhdm(get_total_ram(), vbe_lfb_end);
+    init_hhdm(get_mem_size(true), vbe_lfb_end);
 
     font_attribute.char_height = *(uint8_t *)((0xFFFF800000000000ULL + (uintptr_t)font) + 3);
     max_x = screen.width / 9; // idk this is clean... i'll fix someday... maybe?
     max_y = screen.height / (font_attribute.char_height + 1);
 
-    dprintf("kinit148\nHello!................\n");
-    dprintf("font height: %d\n", font_attribute.char_height);
-    dprintf("font height: %d\n", font_attribute.char_height);
-    dprintf("font height: %d\n", font_attribute.char_height);
-    dprintf("font height: %d\n", font_attribute.char_height);
-    dprintf("font height: %d\n", font_attribute.char_height);
-    for (int i = 0; i < 262; i++) {
-        dprintf("................");
+    dprintf("kinit148\nHello!\n");
+
+    dprintf("mem size: %dMB\n", (get_mem_size(false) >> 20));
+    dprintf("vbe lfb addr: 0x%x\n", screen.fb);
+
+    extern int64_t ata_get_bootbin_size();
+    int64_t size = ata_get_bootbin_size();
+    dprintf("bootbin size: %ld sectors\n", size);
+    if (size == -2) {
+        dprintf("not a koharu bootbin!\n");
+        hlt();
+    } else if (size == -1) {
+        dprintf("read size failed!\n");
+        hlt();
     }
-    dprintf("\nlast line");
-    
-    for (;;) asm __volatile__ ("hlt");
+
+    dprintf("loading bootbin....");
+    extern void ata_load_bootbin();
+    ata_load_bootbin();
+    dprintf("ok"); // Maybe...?
+
+    hlt();
 }

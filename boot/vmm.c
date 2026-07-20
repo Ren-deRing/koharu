@@ -58,7 +58,7 @@ void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end) {
 
     // next, map entire memory.
 
-    uint64_t max_phys_addr = (mem_size > vbe_lfb_end) ? mem_size : vbe_lfb_end;;
+    uint64_t max_phys_addr = (mem_size > vbe_lfb_end) ? mem_size : vbe_lfb_end;
 
     uint64_t total_pdes = (max_phys_addr + 0x1FFFFFULL) >> 21; // max_phys_addr / 2MiB
     uint64_t total_pdts = (total_pdes + 511ULL) >> 9;          // total_pdes / 512

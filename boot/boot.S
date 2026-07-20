@@ -24,11 +24,11 @@ _load:
     mov %ax, %es     # segment is 0..
     mov $0x9000, %bx # and pointer is 9000.
 
-    mov $0x02, %ah  # read sectors
-    mov $0x20, %al  # how many?
-    mov $0x00, %ch  # where?   (cylinder)
-    mov $0x02, %cl  # where??  (sector)
-    mov $0x00, %dh  # where??? (head)
+    mov $0x02, %ah   # read sectors
+    mov $0x20, %al   # how many?
+    mov $0x00, %ch   # where?   (cylinder)
+    mov $0x02, %cl   # where??  (sector)
+    mov $0x00, %dh   # where??? (head)
     mov (drive), %dl # drive
 
     int $0x13 # read!
