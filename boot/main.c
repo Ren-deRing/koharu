@@ -90,7 +90,14 @@ typedef struct {
     uint64_t padding;
 } __attribute__((packed)) mmap_entry_t;
 
-uint64_t get_mem_size(bool is_total) {
+typedef struct {
+    uint64_t total_usable;   // usuable memory size
+    uint64_t max_phys_addr;  // get_mem_size(true);
+    uint64_t entries_addr;   // E820 start addr
+    uint32_t count;          // entry count
+} __attribute__((packed)) boot_mmap_info_t;
+
+uint64_t get_mem_size(bool is_max_addr) {
     volatile mmap_entry_t* mmap_array = (volatile mmap_entry_t*)(uintptr_t)0x8000;
     uint64_t total_size = 0;
     uint64_t max_addr = 0;
@@ -98,7 +105,7 @@ uint64_t get_mem_size(bool is_total) {
     while (mmap_array->base_addr != 0 || mmap_array->length != 0) {
         uint64_t end_addr = mmap_array->base_addr + mmap_array->length;
         
-        if (mmap_array->type == 1 || is_total) {
+        if (mmap_array->type == 1 || is_max_addr) {
             if (end_addr > max_addr) {
                 max_addr = end_addr;
             }
@@ -107,13 +114,20 @@ uint64_t get_mem_size(bool is_total) {
         mmap_array++;
     }
     
-    return is_total ? max_addr : total_size; 
+    return is_max_addr ? max_addr : total_size; 
 }
 
 void hlt(void) {
     dprintf("\nhalted.");
     for (;;) asm __volatile__ ("hlt");
 }
+
+typedef struct {
+    vbe_screen screen;
+    boot_mmap_info_t memory;
+
+    uint64_t initrd_addr;
+} __attribute__((packed)) boot_info_t;
 
 void loader_entry() {
     uint8_t *vbe_base = (uint8_t *)0x5F00;
@@ -161,15 +175,29 @@ void loader_entry() {
     void *kernel_src = cpio_extract(cpio_base, &kernel_size, "kernel.bin");
     void *initrd_src = cpio_extract(cpio_base, &initrd_size, "initrd.cpio");
 
+    if (kernel_src == NULL || initrd_src == NULL) {
+        dprintf("failed to load kernel / initrd!\n");
+        hlt();
+    }
+
     void *kernel_dest = (void *)(0xFFFF800000000000ULL + 0x2000000);
     memcpy(kernel_dest, kernel_src, kernel_size);
 
     dprintf("initrd loaded at: 0x%lx\n", initrd_src);
 
-    void (*kernel_entry)() = (void (*)(void*, uint64_t))0xFFFF800002000000ULL;
+    boot_info_t boot_info;
+    memset(&boot_info, 0, sizeof(boot_info_t));
+
+    boot_info.screen               = screen;
+    boot_info.memory.total_usable  = get_mem_size(false);
+    boot_info.memory.max_phys_addr = get_mem_size(true);
+    boot_info.memory.entries_addr  = 0xFFFF800000008000ULL;
+    boot_info.memory.count         = *(uint8_t *)0x6FFF;
+
+    void (*kernel_entry)(boot_info_t*) = (void (*)(boot_info_t*))0xFFFF800002000000ULL;
 
     dprintf("jumping to kernel.....\n");
-    kernel_entry();
+    kernel_entry(&boot_info);
 
     hlt();
 }
