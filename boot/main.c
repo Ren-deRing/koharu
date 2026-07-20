@@ -151,9 +151,25 @@ void loader_entry() {
     }
 
     dprintf("loading bootbin....");
-    extern void ata_load_bootbin();
-    ata_load_bootbin();
-    dprintf("ok"); // Maybe...?
+    extern int64_t ata_load_bootbin();
+    uint64_t* cpio_base = (uint64_t*)ata_load_bootbin();
+    dprintf("ok\n"); // Maybe...?
+
+    extern void* cpio_extract(void *cpio_base_virt, size_t *out_size, char *target_filename);
+    size_t kernel_size = 0;
+    size_t initrd_size = 0;
+    void *kernel_src = cpio_extract(cpio_base, &kernel_size, "kernel.bin");
+    void *initrd_src = cpio_extract(cpio_base, &initrd_size, "initrd.cpio");
+
+    void *kernel_dest = (void *)(0xFFFF800000000000ULL + 0x2000000);
+    memcpy(kernel_dest, kernel_src, kernel_size);
+
+    dprintf("initrd loaded at: 0x%lx\n", initrd_src);
+
+    void (*kernel_entry)() = (void (*)(void*, uint64_t))0xFFFF800002000000ULL;
+
+    dprintf("jumping to kernel.....\n");
+    kernel_entry();
 
     hlt();
 }

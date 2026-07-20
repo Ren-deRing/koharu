@@ -90,9 +90,10 @@ int64_t ata_get_bootbin_size() {
     return -1;
 }
 
-void ata_load_bootbin() {
+uint32_t* ata_load_bootbin() {
     // kernel is located at the 41th sector (0x28)
     ata_select_drive(0xE0); // 0xE0 => 1(FIXED)1(LBA)1(FIXED)0(MASTER)0000(LBA [27:24])
     uint32_t* bootbin_buffer = (uint32_t*)(0xFFFF800000000000ULL + 0x400000); // anyway... (v2)
     ata_read_sectors(41, ata_get_bootbin_size(), (uint16_t*)bootbin_buffer);
+    return bootbin_buffer;
 }

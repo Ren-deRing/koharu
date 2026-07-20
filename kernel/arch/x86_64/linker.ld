@@ -9,7 +9,7 @@ PHDRS
 
 SECTIONS
 {
-    . = 0xffffffff80000000;
+    . = 0xFFFF800002000000;
     
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
@@ -21,12 +21,12 @@ SECTIONS
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
-    .pure_initcall : {
-        __pure_initcall_start = .;
+    .early_initcall : {
+        __early_initcall_start = .;
         QUAD(0);
-        KEEP(*(SORT_BY_NAME(.pure_initcall.*)))
+        KEEP(*(SORT_BY_NAME(.early_initcall.*)))
         QUAD(0);
-        __pure_initcall_end = .;
+        __early_initcall_end = .;
     } :rodata
 
     .core_initcall : {
@@ -45,36 +45,12 @@ SECTIONS
         __arch_initcall_end = .;
     } :rodata
 
-    .subsys_initcall : {
-        __subsys_initcall_start = .;
+    .sys_initcall : {
+        __sys_initcall_start = .;
         QUAD(0);
-        KEEP(*(SORT_BY_NAME(.subsys_initcall.*)))
+        KEEP(*(SORT_BY_NAME(.sys_initcall.*)))
         QUAD(0);
-        __subsys_initcall_end = .;
-    } :rodata
-
-    .fs_initcall : {
-        __fs_initcall_start = .;
-        QUAD(0);
-        KEEP(*(SORT_BY_NAME(.fs_initcall.*)))
-        QUAD(0);
-        __fs_initcall_end = .;
-    } :rodata
-
-    .device_initcall : {
-        __device_initcall_start = .;
-        QUAD(0);
-        KEEP(*(SORT_BY_NAME(.device_initcall.*)))
-        QUAD(0);
-        __device_initcall_end = .;
-    } :rodata
-
-    .late_initcall : {
-        __late_initcall_start = .;
-        QUAD(0);
-        KEEP(*(SORT_BY_NAME(.late_initcall.*)))
-        QUAD(0);
-        __late_initcall_end = .;
+        __sys_initcall_end = .;
     } :rodata
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));

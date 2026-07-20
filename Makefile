@@ -14,7 +14,7 @@ boot.bin: boot.elf
 stage2.o:
 	clang -target x86_64-unknown-none-elf -c boot/stage2.S -o boot/stage2.o -Os
 
-SRCS = boot/main.c boot/string.c boot/vmm.c boot/ata.c
+SRCS = boot/main.c boot/string.c boot/vmm.c boot/ata.c boot/cpio.c
 OBJS = $(SRCS:.c=.o)
 
 %.o: %.c
@@ -55,10 +55,10 @@ disk.img: boot.bin bootloader.bin bootbin.cpio
 	rm temp.img bootbin_header.bin
 
 bootbin.cpio: kernel.bin
-	find initrd/ -depth | cpio -o > initrd.cpio
+	cd initrd && (find . -type d && find . -type f) | cpio -o -H newc > ../initrd.cpio
 	cp kernel.bin bootbin/
-	cp initrd.cpio bootbin/
-	find bootbin/ -depth | cpio -o > bootbin.cpio
+	mv initrd.cpio bootbin/
+	cd bootbin && (find . -type d && find . -type f) | cpio -o -H newc > ../bootbin.cpio
 
 mkdirs:
 	mkdir -p ./build/ ./bootbin ./initrd
