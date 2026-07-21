@@ -94,6 +94,21 @@ void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end) {
         curr_pdt[entry_index] = (PT_ADDR_MASK & (0x200000ULL * i)) | (PT_PRESENT | PT_WRITABLE | PT_HUGE);
     }
 
+    // uhh,, i think this code needs refactoring
+
+    uint64_t kernel_pdpt_phys = pdt_base_phys + (total_pdts * 0x1000ULL);
+    uint64_t kernel_pdt_phys  = kernel_pdpt_phys + 0x1000ULL;
+
+    pml4t[511] = (PT_ADDR_MASK & kernel_pdpt_phys) | (PT_PRESENT | PT_WRITABLE);
+
+    uint64_t *kernel_pdpt = (uint64_t *)(0xFFFF800000000000ULL + kernel_pdpt_phys);
+    kernel_pdpt[510] = (PT_ADDR_MASK & kernel_pdt_phys) | (PT_PRESENT | PT_WRITABLE);
+
+    uint64_t *kernel_pdt = (uint64_t *)(0xFFFF800000000000ULL + kernel_pdt_phys);
+    for (int i = 0; i < 512; i++) {
+        kernel_pdt[i] = (PT_ADDR_MASK & (0x200000ULL * i)) | (PT_PRESENT | PT_WRITABLE | PT_HUGE);
+    }
+
     asm __volatile__ (
         "movq %0, %%cr3"
         :

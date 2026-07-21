@@ -1,10 +1,12 @@
 BUILD_DIR = ../build
 
-SRCS = generic.c
+SRCS = $(shell find . -type f -name '*.c')
 OBJS = $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))
 
 CC = clang
-CFLAGS = -target x86_64-unknown-none-elf -c \
+CFLAGS = -target x86_64-unknown-none-elf -c -g \
+         -I ../include \
+         -mcmodel=kernel \
          -ffreestanding \
          -O2 \
          -Wall \
@@ -16,14 +18,16 @@ CFLAGS = -target x86_64-unknown-none-elf -c \
          -fno-builtin \
          -fno-stack-protector
 
+LDFLAGS = -m elf_x86_64 -T arch/x86_64/linker.ld
+
 all: ../kernel.bin
 
 $(BUILD_DIR)/%.o: %.c
-	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/kernel.elf: $(OBJS)
-	ld.lld -T arch/x86_64/linker.ld $(OBJS) -o $@
+	ld.lld $(LDFLAGS) $(OBJS) -o $@
 
 ../kernel.bin: $(BUILD_DIR)/kernel.elf
 	llvm-objcopy -O binary $< $@

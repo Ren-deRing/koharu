@@ -9,12 +9,13 @@ PHDRS
 
 SECTIONS
 {
-    . = 0xFFFF800002000000;
+    . = 0xFFFFFFFF82000000;
     
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .text : {
         __text_start = .;
+        *(.text.entry)
         *(.text .text.*)
         __text_end = .;
     } :text
@@ -23,34 +24,32 @@ SECTIONS
 
     .early_initcall : {
         __early_initcall_start = .;
-        QUAD(0);
         KEEP(*(SORT_BY_NAME(.early_initcall.*)))
-        QUAD(0);
         __early_initcall_end = .;
     } :rodata
 
     .core_initcall : {
         __core_initcall_start = .;
-        QUAD(0);
         KEEP(*(SORT_BY_NAME(.core_initcall.*)))
-        QUAD(0);
         __core_initcall_end = .;
     } :rodata
 
     .arch_initcall : {
         __arch_initcall_start = .;
-        QUAD(0);
         KEEP(*(SORT_BY_NAME(.arch_initcall.*)))
-        QUAD(0);
         __arch_initcall_end = .;
     } :rodata
 
     .sys_initcall : {
         __sys_initcall_start = .;
-        QUAD(0);
         KEEP(*(SORT_BY_NAME(.sys_initcall.*)))
-        QUAD(0);
         __sys_initcall_end = .;
+    } :rodata
+
+    .late_initcall : {
+        __late_initcall_start = .;
+        KEEP(*(SORT_BY_NAME(.late_initcall.*)))
+        __late_initcall_end = .;
     } :rodata
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));

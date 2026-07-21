@@ -180,7 +180,7 @@ void loader_entry() {
         hlt();
     }
 
-    void *kernel_dest = (void *)(0xFFFF800000000000ULL + 0x2000000);
+    void *kernel_dest = (void *)(0xFFFFFFFF82000000ULL);
     memcpy(kernel_dest, kernel_src, kernel_size);
 
     dprintf("initrd loaded at: 0x%lx\n", initrd_src);
@@ -193,8 +193,9 @@ void loader_entry() {
     boot_info.memory.max_phys_addr = get_mem_size(true);
     boot_info.memory.entries_addr  = 0xFFFF800000008000ULL;
     boot_info.memory.count         = *(uint8_t *)0x6FFF;
+    boot_info.initrd_addr          = (uint64_t)initrd_src;
 
-    void (*kernel_entry)(boot_info_t*) = (void (*)(boot_info_t*))0xFFFF800002000000ULL;
+    void (*kernel_entry)(boot_info_t*) = (void (*)(boot_info_t*))0xFFFFFFFF82000000ULL;
 
     dprintf("jumping to kernel.....\n");
     kernel_entry(&boot_info);

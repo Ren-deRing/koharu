@@ -72,4 +72,4 @@ run: all
 		-smp 4 \
 		-device piix3-ide,id=legacy_ide \
 		-drive file=disk.img,format=raw,if=none,id=kodisk \
-		-device ide-hd,drive=kodisk,bus=legacy_ide.0,unit=0
+		-device ide-hd,drive=kodisk,bus=legacy_ide.0,unit=0 -serial stdio
