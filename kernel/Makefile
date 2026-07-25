@@ -2,9 +2,11 @@ BUILD_DIR = ../build/kernel
 
 SRCS = $(shell find . -type f -name '*.c')
 OBJS = $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))
+DEPS = $(OBJS:.o=.d)
 
 CC = clang
 CFLAGS = -target x86_64-unknown-none-elf -c -g \
+         -MMD -MP \
          -I ../include \
          -mcmodel=kernel \
          -ffreestanding \
@@ -31,3 +33,5 @@ $(BUILD_DIR)/kernel.elf: $(OBJS)
 
 ../kernel.bin: $(BUILD_DIR)/kernel.elf
 	llvm-objcopy -O binary $< $@
+
+-include $(DEPS)

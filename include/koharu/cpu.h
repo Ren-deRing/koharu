@@ -20,4 +20,6 @@ struct cpu {
 
 struct cpu* get_this_core(void);
 
+void arch_halt();
+
 #define curcpu get_this_core()

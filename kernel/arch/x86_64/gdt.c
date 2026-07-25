@@ -118,4 +118,4 @@ int load_gdt() {
     return 0;
 }
 
-early_initcall(load_gdt, 10);
+early_initcall(load_gdt, B0);

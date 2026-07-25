@@ -5,6 +5,10 @@
 
 struct cpu cpus[MAX_CPUS];
 
+void arch_halt() {
+    asm volatile ("hlt");
+}
+
 static inline uint32_t get_apic_id(void) {
     uint32_t eax, ebx, ecx, edx;
     asm volatile ("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
@@ -42,4 +46,4 @@ int init_percpu() {
     return 0;
 }
 
-early_initcall(init_percpu, 1);
+early_initcall(init_percpu, A2);

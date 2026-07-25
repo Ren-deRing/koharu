@@ -99,6 +99,8 @@ void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end) {
     uint64_t kernel_pdpt_phys = pdt_base_phys + (total_pdts * 0x1000ULL);
     uint64_t kernel_pdt_phys  = kernel_pdpt_phys + 0x1000ULL;
 
+    memset((void *)(0xFFFF800000000000ULL + kernel_pdpt_phys), 0, 514 * 4096);
+
     pml4t[511] = (PT_ADDR_MASK & kernel_pdpt_phys) | (PT_PRESENT | PT_WRITABLE);
 
     uint64_t *kernel_pdpt = (uint64_t *)(0xFFFF800000000000ULL + kernel_pdpt_phys);

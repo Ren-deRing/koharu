@@ -35,6 +35,8 @@ bootbin.cpio: kernel.bin
 mkdirs:
 	mkdir -p ./build/ ./bootbin ./initrd
 
+.PHONY: all mkdirs run clean kernel.bin boot.bin bootloader.bin
+
 run: all
 	qemu-system-x86_64 \
 		-m 4G \
