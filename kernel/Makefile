@@ -1,4 +1,4 @@
-BUILD_DIR = ../build
+BUILD_DIR = ../build/kernel
 
 SRCS = $(shell find . -type f -name '*.c')
 OBJS = $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))

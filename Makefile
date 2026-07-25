@@ -2,42 +2,14 @@ name := koharu
 
 all: mkdirs disk.img
 
-boot.o:
-	clang -target i386-unknown-none-elf -m16 -ffreestanding -c boot/boot.S -o boot/boot.o
-
-boot.elf: boot.o
-	ld.lld -T boot/linker.ld boot/boot.o -o boot/boot.elf
-
-boot.bin: boot.elf
-	llvm-objcopy -O binary boot/boot.elf boot.bin
-
-stage2.o:
-	clang -target x86_64-unknown-none-elf -c boot/stage2.S -o boot/stage2.o -Os
-
-SRCS = boot/main.c boot/string.c boot/vmm.c boot/ata.c boot/cpio.c
-OBJS = $(SRCS:.c=.o)
-
-%.o: %.c
-	clang -target x86_64-unknown-none-elf -c $< -o $@ \
-		-ffreestanding \
-		-Os \
-		-Wall \
-		-Wextra \
-		-mno-red-zone \
-		-mno-mmx \
-		-mno-sse \
-		-mno-sse2 \
-		-fno-builtin \
-		-fno-stack-protector \
-
-bootloader.elf: $(OBJS) stage2.o
-	ld.lld -T boot/linker2.ld boot/stage2.o $(OBJS) -o boot/bootloader.elf
-
-bootloader.bin: bootloader.elf
-	llvm-objcopy -O binary boot/bootloader.elf bootloader.bin
-
 kernel.bin:
 	make -C kernel
+
+boot.bin:
+	make -C boot boot.bin
+
+bootloader.bin:
+	make -C boot bootloader.bin
 
 disk.img: boot.bin bootloader.bin bootbin.cpio
 	cat boot.bin bootloader.bin > temp.img
@@ -66,7 +38,7 @@ mkdirs:
 run: all
 	qemu-system-x86_64 \
 		-m 4G \
-		-cpu host \
+		-cpu host,migratable=off,invtsc=on,tsc-freq=2500000000\
 		-accel kvm \
 		-machine q35 \
 		-smp 4 \

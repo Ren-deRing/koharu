@@ -1,7 +1,7 @@
 #include <koharu/initcall.h>
 #include <koharu/bootinfo.h>
 
-__attribute__((section(".text.entry")))
+__attribute__((section("entry")))
 void generic_entry(boot_info_t* boot_info) {
     volatile uint32_t* fb = boot_info->screen.fb;
     uint32_t total_pixels = (boot_info->screen.pitch / 4) * boot_info->screen.height;

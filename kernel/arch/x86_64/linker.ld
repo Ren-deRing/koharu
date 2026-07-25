@@ -15,7 +15,7 @@ SECTIONS
 
     .text : {
         __text_start = .;
-        *(.text.entry)
+        *(entry)
         *(.text .text.*)
         __text_end = .;
     } :text

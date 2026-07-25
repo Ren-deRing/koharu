@@ -3,8 +3,12 @@
 #include "x86_64.h"
 
 #include <stdint.h>
+#include <stdbool.h>
+
+bool initalized = false;
 
 void uart_putc(char c) {
+    if (!initalized) return;
     while ((inb(0x3F8 + 5) & 0x20) == 0); // waiting for ready....
     
     outb(0x3F8, c); // write!
@@ -19,7 +23,7 @@ int uart_init() {
     outb(SERIAL_UART + 2, 0xC7); // FIFO enable, clear FIFO, 14-byte threshold
     outb(SERIAL_UART + 4, 0x0B); // IRQs enabled, RTS/DSR set (ready to send)
 
-    uart_putc('R');
+    initalized = true;
     return 0;
 }
 
