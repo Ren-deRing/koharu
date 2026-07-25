@@ -46,9 +46,6 @@ int y = 0;
 int max_y;
 
 void dprintf(char const * fmt, ...) {
-    volatile uint16_t* video_mem = (volatile uint16_t *)0xB8000; // VGA text buffer
-    uint16_t color = 0x0F; // black bg & white text
-
     char buffer[256]; // i don't care about 256+
     va_list ap; // variable parameters
     va_start(ap, fmt); // get parameters!
