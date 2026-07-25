@@ -1,0 +1,44 @@
+#include <koharu/cpu.h>
+#include <koharu/initcall.h>
+
+#include <stdatomic.h>
+#include <stdint.h>
+
+struct cpu cpus[MAX_CPUS];
+
+static inline uint32_t get_apic_id(void) {
+    uint32_t eax, ebx, ecx, edx;
+    asm volatile ("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
+    return (ebx >> 24) & 0xFF; // APIC ID here!
+}
+
+void init_cpu_gs(struct cpu* cpu_ptr) {
+    uint64_t addr = (uint64_t)cpu_ptr;
+    // IA32_GS_BASE MSR = 0xC0000101
+    asm volatile ("wrmsr" : : "c"(0xC0000101), "a"((uint32_t)addr), "d"((uint32_t)(addr >> 32)): "memory");
+}
+
+struct cpu* get_this_core(void) {
+    struct cpu* ptr;
+    asm volatile ("movq %%gs:0, %0" : "=r"(ptr)); // struct cpu located at gs[0]
+    return ptr;
+}
+
+volatile uint32_t logic_id = 0;
+
+int init_percpu() {
+    uint32_t hw_id = get_apic_id();
+    uint32_t my_id = __atomic_fetch_add(&logic_id, 1, 5); // __ATOMIC_SEQ_CST
+
+    struct cpu *c = &cpus[my_id];
+
+    c->self  = c;
+    c->id    = my_id;
+    c->hw_id = hw_id;
+
+    init_cpu_gs(c);
+
+    return 0;
+}
+
+early_initcall(init_percpu, 1);

@@ -21,3 +21,5 @@ typedef struct {
     boot_mmap_info_t memory;
     uint64_t initrd_addr;
 } __attribute__((packed)) boot_info_t;
+
+extern boot_info_t boot_info;

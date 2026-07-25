@@ -1,0 +1,6 @@
+CompileFlags:
+  Add: [-Iinclude, -ffreestanding]
+
+Style:
+  AngledHeaders:
+    - ".*"
