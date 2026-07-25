@@ -1,5 +1,6 @@
 #include <koharu/initcall.h>
 #include <koharu/bootinfo.h>
+#include <koharu/print.h>
 
 __attribute__((section("entry")))
 void generic_entry(boot_info_t* boot_info) {
@@ -11,6 +12,11 @@ void generic_entry(boot_info_t* boot_info) {
     }
 
     run_initcalls(__early_initcall_start, __early_initcall_end);
+
+    dprintf("Hello World!\n");
+    dprintf("This is kernel speaking. How are you?\n");
+    dprintf("Uh, anyway, early initcall start addr is 0x%lx\n", __early_initcall_start);
+    dprintf("Have a good day!\n");
 
     for (;;) asm __volatile__ ("hlt");
 }

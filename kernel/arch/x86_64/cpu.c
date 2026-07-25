@@ -1,7 +1,6 @@
 #include <koharu/cpu.h>
 #include <koharu/initcall.h>
 
-#include <stdatomic.h>
 #include <stdint.h>
 
 struct cpu cpus[MAX_CPUS];
@@ -28,7 +27,9 @@ volatile uint32_t logic_id = 0;
 
 int init_percpu() {
     uint32_t hw_id = get_apic_id();
-    uint32_t my_id = __atomic_fetch_add(&logic_id, 1, 5); // __ATOMIC_SEQ_CST
+    uint32_t my_id = __atomic_fetch_add(&logic_id, 1, 5); // __ATOMIC_SEQ_CST (strictest memory model)
+    // this code is run by multiple processors simultaneously.
+    // that means, logic_id could be corrupted! so atomic is used.
 
     struct cpu *c = &cpus[my_id];
 

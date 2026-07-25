@@ -2,6 +2,7 @@
 
 #include "x86_64.h"
 
+#include <koharu/print.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -29,4 +30,10 @@ int uart_init() {
     return 0;
 }
 
+int early_log_init() {
+    set_log_putc(uart_putc);
+    return 0;
+}
+
 early_initcall(uart_init, 0);
+early_initcall(early_log_init, 1);

@@ -109,8 +109,8 @@ void init_gdt() {
 volatile bool is_table_initialized = false;
 
 int load_gdt() {
-    if (!is_table_initialized) init_gdt();
-    is_table_initialized = true;
+    if (!is_table_initialized) init_gdt(); // BSP is not initialized simultaneously with the APs!
+    is_table_initialized = true;           // so, volatile is sufficient.
 
     // load gdt!
     gdt_load(&gdt[curcpu->id].pointer);

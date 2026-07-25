@@ -191,7 +191,7 @@ _ready.long:
 
     mov %cr0, %eax           # read cr0
     or $CR0_PG_ENABLE, %eax  # set PG bit (paging enable)
-    mov %eax, %cr0           # write back 
+    mov %eax, %cr0           # write back
 
 _jmp.long:
     ljmp $0x18, $_start64 # Ring 0, Use GDT, GDT Idx 3
