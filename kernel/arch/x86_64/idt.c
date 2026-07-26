@@ -9,4 +9,4 @@ int init_idt() {
     return -1;
 }
 
-early_initcall(init_idt, B1);
+// early_initcall(init_idt, B1);

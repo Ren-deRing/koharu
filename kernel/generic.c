@@ -19,5 +19,10 @@ void generic_entry(boot_info_t* boot_info) {
     dprintf("Uh, anyway, early initcall start addr is 0x%lx\n", __early_initcall_start);
     dprintf("Have a good day!\n");
 
+    boot_mmap_entry_t* mmap = (boot_mmap_entry_t*)boot_info->memory.entries_addr;
+    for (uint32_t i = 0; i < boot_info->memory.count; i++) {
+        dprintf("%2d: 0x%016lx - 0x%016lx : %u\n", i, mmap[i].base_addr, mmap[i].base_addr + mmap[i].length, mmap[i].type);
+    }
+
     for (;;) arch_halt();
 }

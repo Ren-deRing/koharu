@@ -22,4 +22,12 @@ typedef struct {
     uint64_t initrd_addr;
 } __attribute__((packed)) boot_info_t;
 
+typedef struct {
+    uint64_t base_addr;
+    uint64_t length;
+    uint32_t type;
+    uint32_t acpi_ext_attr;
+    uint64_t padding;
+} __attribute__((packed)) boot_mmap_entry_t;
+
 extern boot_info_t boot_info;

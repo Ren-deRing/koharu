@@ -23,7 +23,6 @@ disk.img: boot.bin bootloader.bin bootbin.cpio
 
 	dd if=bootbin_header.bin of=disk.img bs=512 seek=40 conv=notrunc
 	dd if=bootbin.cpio of=disk.img bs=512 seek=41 conv=notrunc
-	dd if=/dev/zero bs=512 count=20480 >> disk.img 2>/dev/null
 	rm temp.img bootbin_header.bin
 
 bootbin.cpio: kernel.bin

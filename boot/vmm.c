@@ -27,6 +27,14 @@
 
 #include "string.h"
 
+typedef struct {
+    uint64_t base_addr;     // memory addr
+    uint64_t length;        // memory area length
+    uint32_t type;          // 0: Good, 1: Reserved, 2: ACPI reclaimable. 3: ACPI NVS, 4: Containing bad memory 5: bootloader reclaimable
+    uint32_t acpi_ext_attr; // acpi 3.0+ (type 6: bootloader reserved)
+    uint64_t padding;
+} __attribute__((packed)) mmap_entry_t;
+
 void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end) {
     memset((void *)EARLY_PAGE_DEFAULT_ADDR, 0, 0x6000); // clear page table area.
 
@@ -110,6 +118,11 @@ void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end) {
     for (int i = 0; i < 512; i++) {
         kernel_pdt[i] = (PT_ADDR_MASK & (0x200000ULL * i)) | (PT_PRESENT | PT_WRITABLE | PT_HUGE);
     }
+
+    void add_mmap_entry_split(uint64_t new_base, uint64_t new_len, uint32_t new_type);
+    add_mmap_entry_split(0x80000, 0x6000, 5); // 5: MMAP_TYPE_BOOTLOADER_RECLAIMABLE
+    uint64_t pt_total_size = (1 + total_pdpts + total_pdts + 514) * 4096ULL;
+    add_mmap_entry_split(0x100000, pt_total_size, 5);
 
     asm __volatile__ (
         "movq %0, %%cr3"

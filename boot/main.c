@@ -82,8 +82,8 @@ void dprintf(char const * fmt, ...) {
 typedef struct {
     uint64_t base_addr;     // memory addr
     uint64_t length;        // memory area length
-    uint32_t type;          // 0: Good, 1: Reserved, 2: ACPI reclaimable. 3: ACPI NVS, 4: Containing bad memory
-    uint32_t acpi_ext_attr; // acpi 3.0+
+    uint32_t type;          // 0: Good, 1: Reserved, 2: ACPI reclaimable. 3: ACPI NVS, 4: Containing bad memory 5: bootloader reclaimable
+    uint32_t acpi_ext_attr; // acpi 3.0+ (type 6: bootloader reserved)
     uint64_t padding;
 } __attribute__((packed)) mmap_entry_t;
 
@@ -112,6 +112,99 @@ uint64_t get_mem_size(bool is_max_addr) {
     }
     
     return is_max_addr ? max_addr : total_size; 
+}
+
+void add_mmap_entry_split(uint64_t new_base, uint64_t new_len, uint32_t new_type) {
+    volatile mmap_entry_t* mmap = (volatile mmap_entry_t*)(uintptr_t)0xFFFF800000008000ULL;
+    uint8_t *count_ptr = (uint8_t *)0xFFFF800000006FFFULL;
+    uint32_t count = *count_ptr;
+
+    uint64_t new_end = new_base + new_len;
+
+    for (uint32_t i = 0; i < count; i++) {
+        uint64_t entry_base = mmap[i].base_addr;
+        uint64_t entry_end = entry_base + mmap[i].length;
+
+        // [ENTRY_BASE] <= [NEW_BASE] < [NEW_END] <= [ENTRY_END]
+        if (new_base >= entry_base && new_end <= entry_end) {
+
+            bool has_left  = (new_base > entry_base);
+            bool has_right = (new_end < entry_end);
+
+            if (has_left && has_right) {
+                // cut middle!
+                for (uint32_t j = count + 1; j > i + 2; j--) {
+                    mmap[j] = mmap[j - 2];
+                }
+
+                // Left
+                mmap[i].length = new_base - entry_base;
+
+                // New
+                mmap[i + 1].base_addr = new_base;
+                mmap[i + 1].length = new_len;
+                mmap[i + 1].type = new_type;
+                mmap[i + 1].acpi_ext_attr = 1;
+
+                // Right
+                mmap[i + 2].base_addr = new_end;
+                mmap[i + 2].length = entry_end - new_end;
+                mmap[i + 2].type = mmap[i].type;
+                mmap[i + 2].acpi_ext_attr = 1;
+
+                *count_ptr = count + 2;
+            } 
+            else if (has_left && !has_right) {
+                // cut right entry
+                for (uint32_t j = count; j > i + 1; j--) {
+                    mmap[j] = mmap[j - 1];
+                }
+
+                // Left
+                mmap[i].length = new_base - entry_base;
+
+                // New
+                mmap[i + 1].base_addr = new_base;
+                mmap[i + 1].length = new_len;
+                mmap[i + 1].type = new_type;
+                mmap[i + 1].acpi_ext_attr = 1;
+
+                *count_ptr = count + 1;
+            } 
+            else if (!has_left && has_right) {
+                // cut left entry
+                for (uint32_t j = count; j > i + 1; j--) {
+                    mmap[j] = mmap[j - 1];
+                }
+
+                // New
+                uint32_t old_type = mmap[i].type;
+                mmap[i].length = new_len;
+                mmap[i].type = new_type;
+
+                // Right
+                mmap[i + 1].base_addr = new_end;
+                mmap[i + 1].length = entry_end - new_end;
+                mmap[i + 1].type = old_type;
+                mmap[i + 1].acpi_ext_attr = 1;
+
+                *count_ptr = count + 1;
+            } 
+            else {
+                // NEW = OLD
+                mmap[i].type = new_type;
+            }
+
+            return;
+        }
+    }
+
+    // no clips? just append.
+    mmap[count].base_addr = new_base;
+    mmap[count].length = new_len;
+    mmap[count].type = new_type;
+    mmap[count].acpi_ext_attr = 1;
+    *count_ptr = count + 1;
 }
 
 void hlt(void) {
@@ -181,6 +274,8 @@ void loader_entry() {
     memcpy(kernel_dest, kernel_src, kernel_size);
 
     dprintf("initrd loaded at: 0x%lx\n", initrd_src);
+
+    add_mmap_entry_split((uint64_t)initrd_src - 0xFFFF800000000000ULL, initrd_size, 6);
 
     boot_info_t boot_info;
     memset(&boot_info, 0, sizeof(boot_info_t));
