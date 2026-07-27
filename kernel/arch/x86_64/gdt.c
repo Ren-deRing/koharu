@@ -75,7 +75,7 @@ static inline void gdt_load(gdtr_t* ptr) {
     );
 }
 
-void init_gdt() {
+int init_gdt() {
     for (int i = 0; i < MAX_CPUS; i++) {
         set_gdt_entry(&gdt[i].entries[1], 0x9A, 0x20); // kernel code (0x08)
         set_gdt_entry(&gdt[i].entries[2], 0x92, 0x00); // kernel data (0x10)
@@ -104,9 +104,11 @@ void init_gdt() {
         gdt[i].pointer.limit = sizeof(gdt[i].entries) - 1;
         gdt[i].pointer.base  = (uintptr_t)&gdt[i].entries[0];
     }
+
+    return 0;
 }
 
-volatile bool is_table_initialized = false;
+static volatile bool is_table_initialized = false;
 
 int load_gdt() {
     if (!is_table_initialized) init_gdt(); // BSP is not initialized simultaneously with the APs!

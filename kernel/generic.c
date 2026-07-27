@@ -24,5 +24,13 @@ void generic_entry(boot_info_t* boot_info) {
         dprintf("%2d: 0x%016lx - 0x%016lx : %u\n", i, mmap[i].base_addr, mmap[i].base_addr + mmap[i].length, mmap[i].type);
     }
 
+    dprintf("faulting..\n");
+
+    asm volatile ("int $0x3");
+
+    dprintf("another?\n");
+
+    asm volatile ("int $0x0");
+
     for (;;) arch_halt();
 }

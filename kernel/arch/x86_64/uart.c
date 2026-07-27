@@ -1,8 +1,9 @@
 #include <koharu/initcall.h>
-
-#include "x86_64.h"
-
 #include <koharu/print.h>
+
+#include <io.h>
+#include <uart.h>
+
 #include <stdint.h>
 #include <stdbool.h>
 
