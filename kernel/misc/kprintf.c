@@ -1,3 +1,4 @@
+#include <koharu/compiler.h>
 #include <koharu/print.h>
 
 #include <stdarg.h>
@@ -12,8 +13,14 @@ void set_log_putc(log_putc new_putc) {
 }
 
 void kputc(char c) {
-    if (!klog_putc) return;
-    klog_putc(c);
+    if (klog_putc) {
+        klog_putc(c);
+    }
+}
+
+void _npf_putc(int c, void* ctx) {
+    (void)ctx;
+    kputc((char)c);
 }
 
 void dprintf(const char* fmt, ...) {
@@ -21,11 +28,7 @@ void dprintf(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    npf_vsnprintf(buffer, sizeof(buffer), fmt, args);
+    npf_vpprintf(_npf_putc, NULL, fmt, args);
 
     va_end(args);
-
-    for (int i = 0; buffer[i] != '\0'; i++) {
-        kputc(buffer[i]);
-    }
 }
