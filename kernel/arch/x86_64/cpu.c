@@ -27,6 +27,10 @@ struct cpu* get_this_core(void) {
     return ptr;
 }
 
+struct cpu* id_to_cpu(uint16_t cpu_id) {
+    return &cpus[cpu_id];
+}
+
 volatile uint32_t logic_id = 0;
 
 int init_percpu() {

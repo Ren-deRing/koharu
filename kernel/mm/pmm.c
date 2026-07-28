@@ -1,4 +1,6 @@
 #include <koharu/bootinfo.h>
+#include <koharu/cpu.h>
+#include <koharu/mmu.h>
 #include <koharu/initcall.h>
 #include <koharu/list.h>
 #include <koharu/print.h>
@@ -9,52 +11,60 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#define PAGE_SHIFT 12 
-#define PAGE_SIZE  (1ULL << PAGE_SHIFT)
-#define MAX_BUDDY_ORDER 11
-
-#define ALIGN_UP(addr, align)   (((addr) + (align) - 1) & ~((align) - 1))
-#define ALIGN_DOWN(addr, align) ((addr) & ~((align) - 1))
-
-#define HHDM_OFFSET 0xFFFF800000000000ULL
-
-typedef struct {
-    list_node page_list;
-    bool is_free;
-} page_t;
-
 typedef struct {
     list_head free_list;
-    size_t free_count;
+    size_t    free_count;
 } buddy_order;
 
 typedef struct {
     buddy_order orders[MAX_BUDDY_ORDER];
-    page_t *mem_map;
-    uintptr_t mem_map_phys;
-    size_t mem_map_size;
-    size_t total_pages;
-    uintptr_t mem_start;
-    uintptr_t mem_end;
-    size_t free_pages;
+    page_t     *mem_map;
+    uintptr_t   mem_map_phys;
+    size_t      mem_map_size;
+    size_t      total_pages;
+    uintptr_t   mem_start;
+    uintptr_t   mem_end;
+    size_t      free_pages;
 } pmm_t;
 
 static pmm_t g_pmm;
 
-static inline size_t phys_to_pfn(uintptr_t phys) {
+uintptr_t virt_to_phys(void *addr) {
+    return (uintptr_t)addr - HHDM_OFFSET;
+}
+
+void* phys_to_virt(uintptr_t phys) {
+    return (void *)(phys + HHDM_OFFSET);
+}
+
+size_t phys_to_pfn(uintptr_t phys) {
     return (size_t)(phys >> PAGE_SHIFT);
 }
 
-static inline uintptr_t pfn_to_phys(size_t pfn) {
+uintptr_t pfn_to_phys(size_t pfn) {
     return (uintptr_t)pfn << PAGE_SHIFT;
 }
 
-static inline page_t* pfn_to_page(size_t pfn) {
+page_t* pfn_to_page(size_t pfn) {
     return &g_pmm.mem_map[pfn];
 }
 
-static inline size_t page_to_pfn(page_t* pg) {
+size_t page_to_pfn(page_t* pg) {
     return (size_t)(pg - g_pmm.mem_map);
+}
+
+page_t* virt_to_page(void *ptr) {
+    uintptr_t phys = virt_to_phys(ptr);
+    size_t pfn  = phys_to_pfn(phys);
+
+    return &g_pmm.mem_map[pfn];
+}
+
+void* page_to_virt(page_t *page) {
+    uintptr_t pfn  = page_to_pfn(page);
+    uintptr_t phys = pfn_to_phys(pfn);
+
+    return phys_to_virt(phys);
 }
 
 void* pmm_alloc_pages(int order) {
@@ -85,6 +95,8 @@ void* pmm_alloc_pages(int order) {
         page->is_free = false;
 
         g_pmm.free_pages -= (1ULL << order);
+
+        dprintf("allocated: order %d\n", order);
         return (void*)pfn_to_phys(pfn); // return phys addr
     }
 
