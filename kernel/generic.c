@@ -4,6 +4,7 @@
 #include <koharu/mmu.h>
 #include <koharu/print.h>
 #include <stddef.h>
+#include <stdint.h>
 
 boot_info_t* g_boot_info;
 
@@ -34,15 +35,25 @@ void generic_entry(boot_info_t* boot_info) {
 
     asm volatile ("int $0x3");
 
-    uintptr_t pages[1024];
     for (int i = 0; i < 1024; i++) {
-        pages[i] = (uintptr_t)pmm_alloc_pages(10);
-        if (!pages[i]) {
+        uintptr_t page = (uintptr_t)pmm_alloc_pages(10);
+        if (!page) {
             dprintf("Failed at index %d\n", i);
             break;
         }
-        dprintf("allocated [%d]: 0x%lx\n", i, pages[i]);
+        dprintf("allocated [%d]: 0x%lx\n", i, page);
+        pmm_free_pages((void*)page, 10);
     }
+
+    void *ptr1 = pmm_alloc_pages(0);
+    void *ptr2 = pmm_alloc_pages(0);
+    dprintf("alloc: %p\n", ptr1);
+    dprintf("alloc: %p\n", ptr2);
+
+    void *ptr3 = pmm_alloc_pages(0);
+    void *ptr4 = pmm_alloc_pages(0);
+    dprintf("alloc: %p\n", ptr3);
+    dprintf("alloc: %p\n", ptr4);
 
     for (;;) arch_halt();
 }

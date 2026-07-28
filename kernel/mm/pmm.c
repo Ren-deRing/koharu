@@ -77,7 +77,7 @@ void* pmm_alloc_pages(int order) {
             page_t* buddy = pfn_to_page(buddy_pfn); // oh, there!
             buddy->is_free = true;
 
-            list_add_tail(&buddy->page_list, &g_pmm.orders[curr_order].free_list); // add to freelist..
+            list_add(&buddy->page_list, &g_pmm.orders[curr_order].free_list); // add to freelist..
             g_pmm.orders[curr_order].free_count++;
         }
 
@@ -89,6 +89,35 @@ void* pmm_alloc_pages(int order) {
     }
 
     return NULL; // OOM!
+}
+
+void pmm_free_pages(void* addr, int order) {
+    if (addr == NULL || order < 0 || order >= MAX_BUDDY_ORDER) return;
+
+    size_t pfn = phys_to_pfn((uintptr_t)addr);
+    int curr_order = order;
+
+    while (curr_order < MAX_BUDDY_ORDER - 1) {
+        size_t buddy_pfn = pfn ^ (1ULL << curr_order); // hey ~~~
+        page_t* buddy = pfn_to_page(buddy_pfn); // oh, ~~~~
+
+        if (!buddy->is_free) break; // buddy is not free
+
+        list_del(&buddy->page_list);
+        buddy->is_free = false;
+        g_pmm.orders[curr_order].free_count--;
+
+        pfn = pfn & buddy_pfn; // merge!
+        curr_order++;
+    }
+
+    // add merged page to list
+    page_t* page = pfn_to_page(pfn);
+    page->is_free = true;
+    list_add_tail(&page->page_list, &g_pmm.orders[curr_order].free_list);
+    g_pmm.orders[curr_order].free_count++;
+
+    g_pmm.free_pages += (1ULL << order);
 }
 
 int pmm_init() {
@@ -154,8 +183,8 @@ int pmm_init() {
                 for (int order = MAX_BUDDY_ORDER - 1; order >= 0; order--) {
                     size_t block_size = 1ULL << (PAGE_SHIFT + order);
                     if (remain >= block_size && (curr & (block_size - 1)) == 0) {
-                        target_order = order;
-                        break;
+                        target_order = order; // if addr is aligend to block
+                        break;                // and the size is smaller than block size
                     }
                 }
 
