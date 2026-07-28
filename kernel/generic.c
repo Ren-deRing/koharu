@@ -1,10 +1,16 @@
 #include <koharu/cpu.h>
 #include <koharu/initcall.h>
 #include <koharu/bootinfo.h>
+#include <koharu/mmu.h>
 #include <koharu/print.h>
+#include <stddef.h>
+
+boot_info_t* g_boot_info;
 
 __attribute__((section("entry")))
 void generic_entry(boot_info_t* boot_info) {
+    g_boot_info = boot_info;
+
     volatile uint32_t* fb = boot_info->screen.fb;
     uint32_t total_pixels = (boot_info->screen.pitch / 4) * boot_info->screen.height;
     
@@ -13,24 +19,30 @@ void generic_entry(boot_info_t* boot_info) {
     }
 
     run_initcalls(__early_initcall_start, __early_initcall_end);
+    run_initcalls(__arch_initcall_start, __arch_initcall_end);
+    run_initcalls(__core_initcall_start, __core_initcall_end);
 
-    dprintf("Hello World!\n");
-    dprintf("This is kernel speaking. How are you?\n");
-    dprintf("Uh, anyway, early initcall start addr is 0x%lx\n", __early_initcall_start);
-    dprintf("Have a good day!\n");
-
-    boot_mmap_entry_t* mmap = (boot_mmap_entry_t*)boot_info->memory.entries_addr;
-    for (uint32_t i = 0; i < boot_info->memory.count; i++) {
-        dprintf("%2d: 0x%016lx - 0x%016lx : %u\n", i, mmap[i].base_addr, mmap[i].base_addr + mmap[i].length, mmap[i].type);
+    for (size_t i = 0; i < g_boot_info->memory.count; i++) {
+        dprintf("  [%02lu] Base: 0x%016lx | Length: 0x%016lx | Type: %u\n",
+                i,
+                g_boot_info->memory.entries[i].base_addr,
+                g_boot_info->memory.entries[i].length,
+                g_boot_info->memory.entries[i].type);
     }
 
-    dprintf("faulting..\n");
+    dprintf("faulting myself..\n");
 
     asm volatile ("int $0x3");
 
-    dprintf("another?\n");
-
-    asm volatile ("int $0x0");
+    uintptr_t pages[1024];
+    for (int i = 0; i < 1024; i++) {
+        pages[i] = (uintptr_t)pmm_alloc_pages(10);
+        if (!pages[i]) {
+            dprintf("Failed at index %d\n", i);
+            break;
+        }
+        dprintf("allocated [%d]: 0x%lx\n", i, pages[i]);
+    }
 
     for (;;) arch_halt();
 }

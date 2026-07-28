@@ -1,5 +1,6 @@
 #pragma once
 
+#include <koharu/list.h>
 typedef enum ipc_endpoint_state {
     IPC_EP_INACTIVE,
     IPC_EP_WAIT_SEND,  // Clients waiting
@@ -9,8 +10,7 @@ typedef enum ipc_endpoint_state {
 struct ipc_endpoint {
     ipc_endpoint_state_t state;
 
-    struct thread *head;
-    struct thread *tail;
+    list_node            ipc_waitqueue;
 };
 
 typedef struct ipc_endpoint ipc_endpoint_t;

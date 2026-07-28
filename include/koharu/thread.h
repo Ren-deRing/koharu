@@ -1,5 +1,7 @@
 #pragma once
 
+#include <koharu/list.h>
+
 #include <asm/thread.h>
 #include <asm/trapframe.h>
 
@@ -23,11 +25,8 @@ struct thread {
     
     uint32_t           cpu_affinity;
 
-    struct thread     *ipc_next;
-    struct thread     *ipc_prev;
-
-    struct thread     *next;
-    struct thread     *prev;
+    list_node          sched_list;
+    list_node          ipc_list;
 
     struct trapframe  *tf;
     struct arch_thread arch;
