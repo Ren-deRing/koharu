@@ -2,7 +2,7 @@ name := koharu
 
 all: mkdirs disk.img
 
-kernel.bin:
+kernel.elf:
 	make -C kernel
 
 boot.bin:
@@ -25,21 +25,21 @@ disk.img: boot.bin bootloader.bin bootbin.cpio
 	dd if=bootbin.cpio of=disk.img bs=512 seek=41 conv=notrunc
 	rm temp.img bootbin_header.bin
 
-bootbin.cpio: kernel.bin
+bootbin.cpio: kernel.elf
 	cd initrd && (find . -type d && find . -type f) | cpio -o -H newc > ../initrd.cpio
-	cp kernel.bin bootbin/
+	cp kernel.elf bootbin/
 	mv initrd.cpio bootbin/
 	cd bootbin && (find . -type d && find . -type f) | cpio -o -H newc > ../bootbin.cpio
 
 mkdirs:
 	mkdir -p ./build/ ./bootbin ./initrd
 
-.PHONY: all mkdirs run clean kernel.bin boot.bin bootloader.bin
+.PHONY: all mkdirs run clean kernel.elf boot.bin bootloader.bin
 
 run: all
 	qemu-system-x86_64 \
 		-m 4G \
-		-cpu host,migratable=off,invtsc=on,tsc-freq=2500000000\
+		-cpu host,migratable=off,invtsc=on,tsc-freq=2500000000 \
 		-accel kvm \
 		-machine q35 \
 		-smp 4 \

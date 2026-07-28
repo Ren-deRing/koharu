@@ -8,6 +8,7 @@
 #include "nanoprintf.h"
 
 #include "font.h"
+#include "elf.h"
 
 typedef struct {
     uint16_t magic;  // 0x36, 0x04, 0x03, 0x10
@@ -82,7 +83,7 @@ void dprintf(char const * fmt, ...) {
 typedef struct {
     uint64_t base_addr;     // memory addr
     uint64_t length;        // memory area length
-    uint32_t type;          // 0: Good, 1: Reserved, 2: ACPI reclaimable. 3: ACPI NVS, 4: Containing bad memory 5: bootloader reclaimable
+    uint32_t type;          // 1: Good, 2: Reserved, 3: ACPI NVS, 4: Containing bad memory 5: bootloader reclaimable
     uint32_t acpi_ext_attr; // acpi 3.0+ (type 6: bootloader reserved)
     uint64_t padding;
 } __attribute__((packed)) mmap_entry_t;
@@ -90,7 +91,7 @@ typedef struct {
 typedef struct {
     uint64_t total_usable;   // usuable memory size
     uint64_t max_phys_addr;  // get_mem_size(true);
-    uint64_t entries_addr;   // E820 start addr
+    mmap_entry_t* entries;   // E820 list pointer
     uint32_t count;          // entry count
 } __attribute__((packed)) boot_mmap_info_t;
 
@@ -207,6 +208,22 @@ void add_mmap_entry_split(uint64_t new_base, uint64_t new_len, uint32_t new_type
     *count_ptr = count + 1;
 }
 
+void sort_mmap() {
+    volatile mmap_entry_t* mmap = (volatile mmap_entry_t*)(uintptr_t)0xFFFF800000008000ULL;
+    uint8_t *count_ptr = (uint8_t *)0xFFFF800000006FFFULL;
+    uint32_t count = *count_ptr;
+
+    for (uint32_t i = 0; i < count - 1; i++) {
+        for (uint32_t j = 0; j < count - i - 1; j++) {
+            if (mmap[j].base_addr > mmap[j + 1].base_addr) {
+                mmap_entry_t temp = mmap[j];
+                mmap[j] = mmap[j + 1];
+                mmap[j + 1] = temp;
+            }
+        }
+    }
+}
+
 void hlt(void) {
     dprintf("\nhalted.");
     for (;;) asm __volatile__ ("hlt");
@@ -233,6 +250,8 @@ void loader_entry() {
 
     extern void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end);
     init_hhdm(get_mem_size(true), vbe_lfb_end);
+
+    sort_mmap();
 
     font_attribute.char_height = *(uint8_t *)((0xFFFF800000000000ULL + (uintptr_t)font) + 3);
     max_x = screen.width / 9; // idk this is clean... i'll fix someday... maybe?
@@ -262,7 +281,7 @@ void loader_entry() {
     extern void* cpio_extract(void *cpio_base_virt, size_t *out_size, char *target_filename);
     size_t kernel_size = 0;
     size_t initrd_size = 0;
-    void *kernel_src = cpio_extract(cpio_base, &kernel_size, "kernel.bin");
+    void *kernel_src = cpio_extract(cpio_base, &kernel_size, "kernel.elf");
     void *initrd_src = cpio_extract(cpio_base, &initrd_size, "initrd.cpio");
 
     if (kernel_src == NULL || initrd_src == NULL) {
@@ -270,8 +289,36 @@ void loader_entry() {
         hlt();
     }
 
-    void *kernel_dest = (void *)(0xFFFFFFFF82000000ULL);
-    memcpy(kernel_dest, kernel_src, kernel_size);
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)kernel_src;
+
+    if (ehdr->e_ident[EI_MAG0] != ELFMAG0 || ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
+        ehdr->e_ident[EI_MAG2] != ELFMAG2 || ehdr->e_ident[EI_MAG3] != ELFMAG3) {
+        dprintf("Invalid ELF header!\n");
+        hlt();
+    }
+
+    Elf64_Phdr *phdr = (Elf64_Phdr *)((uint8_t *)kernel_src + ehdr->e_phoff);
+
+    for (uint16_t i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD) {
+            uint8_t *dest = (uint8_t *)phdr[i].p_vaddr;
+            uint8_t *src = (uint8_t *)kernel_src + phdr[i].p_offset;
+
+            memcpy(dest, src, phdr[i].p_filesz);
+
+            if (phdr[i].p_memsz > phdr[i].p_filesz) {
+                memset(dest + phdr[i].p_filesz, 0, phdr[i].p_memsz - phdr[i].p_filesz);
+            }
+
+            uintptr_t phys_start = phdr[i].p_vaddr - 0xFFFFFFFF80000000ULL;
+            uintptr_t page_start = phys_start & ~0xFFFULL;
+
+            uintptr_t phys_end = phys_start + phdr[i].p_memsz;
+            uintptr_t page_end = (phys_end + 0xFFFULL) & ~0xFFFULL;
+            
+            add_mmap_entry_split(page_start, page_end - page_start, 6);
+        }
+    }
 
     dprintf("initrd loaded at: 0x%lx\n", initrd_src);
 
@@ -283,11 +330,11 @@ void loader_entry() {
     boot_info.screen               = screen;
     boot_info.memory.total_usable  = get_mem_size(false);
     boot_info.memory.max_phys_addr = get_mem_size(true);
-    boot_info.memory.entries_addr  = 0xFFFF800000008000ULL;
-    boot_info.memory.count         = *(uint8_t *)0x6FFF;
+    boot_info.memory.entries       = (mmap_entry_t*)0xFFFF800000008000ULL;
+    boot_info.memory.count         = *(uint8_t *)0xFFFF800000006FFFULL;
     boot_info.initrd_addr          = (uint64_t)initrd_src;
 
-    void (*kernel_entry)(boot_info_t*) = (void (*)(boot_info_t*))0xFFFFFFFF82000000ULL;
+    void (*kernel_entry)(boot_info_t*) = (void (*)(boot_info_t*))ehdr->e_entry;
 
     dprintf("jumping to kernel.....\n");
     kernel_entry(&boot_info);

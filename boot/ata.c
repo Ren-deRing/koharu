@@ -20,10 +20,13 @@ static inline uint8_t inb(uint16_t port) {
     return ret;
 }
 
-static inline uint16_t inw(uint16_t port) {
-    uint16_t ret;
-    asm __volatile__ ("inw %1, %0" : "=a"(ret) : "Nd"(port));
-    return ret;
+static inline void insw(uint16_t port, void *addr, uint32_t count) {
+    asm __volatile__ (
+        "rep insw"
+        : "+D" (addr), "+c" (count)
+        : "d" (port)
+        : "memory"
+    );
 }
 
 static uint8_t selected_drive = 0xFF;
@@ -42,35 +45,41 @@ void ata_select_drive(uint8_t drive) {
 }
 
 void ata_read_sectors(uint64_t lba_addr, uint64_t sectors, uint16_t* buffer) {
-    ata_select_drive(0xE0 | ((lba_addr >> 24) & 0x0F)); // LBA [27:24]
+    while (sectors > 0) {
+        uint32_t count = (sectors > 256) ? 256 : sectors;
+        uint8_t sec_cnt = (count == 256) ? 0 : (uint8_t)count;
 
-    outb(ATA_REG_SECCOUNT, (uint8_t)sectors); // how many sectors to read
-    outb(ATA_REG_LBA_LO, (uint8_t)(lba_addr & 0xFF)); // LBA [7:0]
-    outb(ATA_REG_LBA_MID, (uint8_t)((lba_addr >> 8) & 0xFF)); // LBA [15:8]
-    outb(ATA_REG_LBA_HI, (uint8_t)((lba_addr >> 16) & 0xFF)); // LBA [23:16]
+        ata_select_drive(0xE0 | ((lba_addr >> 24) & 0x0F)); // LBA [27:24]
 
-    outb(ATA_REG_COMMAND, 0x20); // READ!
+        outb(ATA_REG_SECCOUNT, sec_cnt); // how many sectors to read
+        outb(ATA_REG_LBA_LO, (uint8_t)(lba_addr & 0xFF)); // LBA [7:0]
+        outb(ATA_REG_LBA_MID, (uint8_t)((lba_addr >> 8) & 0xFF)); // LBA [15:8]
+        outb(ATA_REG_LBA_HI, (uint8_t)((lba_addr >> 16) & 0xFF)); // LBA [23:16]
 
-    for (int i = 0; i < 4; i++) { // bus is slow....
-        inb(ATA_REG_STATUS);
-    }
+        outb(ATA_REG_COMMAND, 0x20); // READ!
 
-    for (uint64_t s = 0; s < sectors; s++) {
-        // wait until (!BSY(0x80)(BUSY) && DRQ(0x08)(DATA READY))
-        while (1) {
-            uint8_t status = inb(ATA_REG_STATUS);
-            if ((status & 0x80) == 0 && (status & 0x08) != 0) {
-                break;
-            }
-            if (status & 0x01) {
-                return;
-            }
+        for (int i = 0; i < 4; i++) { // bus is slow....
+            inb(ATA_REG_STATUS);
         }
 
-        for (int w = 0; w < 256; w++) {
-            *buffer = inw(ATA_REG_DATA); // read
-            buffer++;
+        for (uint64_t s = 0; s < count; s++) {
+            // wait until (!BSY(0x80)(BUSY) && DRQ(0x08)(DATA READY))
+            while (1) {
+                uint8_t status = inb(ATA_REG_STATUS);
+                if ((status & 0x80) == 0 && (status & 0x08) != 0) {
+                    break;
+                }
+                if (status & 0x01) {
+                    return;
+                }
+            }
+
+            insw(ATA_REG_DATA, buffer, 256);
+            buffer += 256;
         }
+
+        sectors -= count;
+        lba_addr += count;
     }
 }
 

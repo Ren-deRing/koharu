@@ -58,7 +58,7 @@ void* cpio_extract(void *cpio_base_virt, size_t *out_size, char *target_filename
 
         void *file_data_ptr = (void *)(base_addr + current_offset + data_offset);
 
-        if (strncmp(filename, target_filename, namesize) == 0) { // is this....?
+        if (strcmp(filename, target_filename) == 0) { // is this....?
             *out_size = filesize;
             return file_data_ptr; // oh good let's go
         }

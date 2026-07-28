@@ -30,7 +30,7 @@ ASMFLAGS = $(CFLAGS)
 
 LDFLAGS = -m elf_x86_64 -T arch/x86_64/linker.ld
 
-all: ../kernel.bin
+all: ../kernel.elf
 
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -40,10 +40,7 @@ $(BUILD_DIR)/%.o: %.S
 	@mkdir -p $(dir $@)
 	$(CC) $(ASMFLAGS) $< -o $@
 
-$(BUILD_DIR)/kernel.elf: $(OBJS)
+../kernel.elf: $(OBJS)
 	ld.lld $(LDFLAGS) $(OBJS) -o $@
-
-../kernel.bin: $(BUILD_DIR)/kernel.elf
-	llvm-objcopy -O binary $< $@
 
 -include $(DEPS)
