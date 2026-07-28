@@ -107,7 +107,7 @@ void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end) {
     uint64_t kernel_pdpt_phys = pdt_base_phys + (total_pdts * 0x1000ULL);
     uint64_t kernel_pdt_phys  = kernel_pdpt_phys + 0x1000ULL;
 
-    memset((void *)(0xFFFF800000000000ULL + kernel_pdpt_phys), 0, 514 * 4096);
+    memset((void *)(0xFFFF800000000000ULL + kernel_pdpt_phys), 0, 2 * 4096);
 
     pml4t[511] = (PT_ADDR_MASK & kernel_pdpt_phys) | (PT_PRESENT | PT_WRITABLE);
 
@@ -121,7 +121,7 @@ void init_hhdm(uint64_t mem_size, uint64_t vbe_lfb_end) {
 
     void add_mmap_entry_split(uint64_t new_base, uint64_t new_len, uint32_t new_type);
     add_mmap_entry_split(0x80000, 0x6000, 5); // 5: MMAP_TYPE_BOOTLOADER_RECLAIMABLE
-    uint64_t pt_total_size = (1 + total_pdpts + total_pdts + 514) * 4096ULL;
+    uint64_t pt_total_size = (1 + total_pdpts + total_pdts + 2) * 4096ULL;
     add_mmap_entry_split(0x100000, pt_total_size, 5);
 
     asm __volatile__ (

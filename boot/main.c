@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -230,8 +231,15 @@ void hlt(void) {
 }
 
 typedef struct {
+    uint64_t kernel_src;
+    size_t kernel_size;
+} __attribute__((packed)) kernel_info_t;
+
+typedef struct {
     vbe_screen screen;
     boot_mmap_info_t memory;
+
+    kernel_info_t kernel;
 
     uint64_t initrd_addr;
 } __attribute__((packed)) boot_info_t;
@@ -332,6 +340,8 @@ void loader_entry() {
     boot_info.memory.max_phys_addr = get_mem_size(true);
     boot_info.memory.entries       = (mmap_entry_t*)0xFFFF800000008000ULL;
     boot_info.memory.count         = *(uint8_t *)0xFFFF800000006FFFULL;
+    boot_info.kernel.kernel_src    = (uint64_t)kernel_src;
+    boot_info.kernel.kernel_size   = kernel_size;
     boot_info.initrd_addr          = (uint64_t)initrd_src;
 
     void (*kernel_entry)(boot_info_t*) = (void (*)(boot_info_t*))ehdr->e_entry;

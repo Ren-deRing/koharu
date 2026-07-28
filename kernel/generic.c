@@ -27,32 +27,6 @@ void generic_entry(boot_info_t* boot_info) {
     run_initcalls(__arch_initcall_start, __arch_initcall_end);
     run_initcalls(__core_initcall_start, __core_initcall_end);
 
-    for (size_t i = 0; i < g_boot_info->memory.count; i++) {
-        dprintf("  [%02lu] Base: 0x%016lx | Length: 0x%016lx | Type: %u\n",
-                i,
-                g_boot_info->memory.entries[i].base_addr,
-                g_boot_info->memory.entries[i].length,
-                g_boot_info->memory.entries[i].type);
-    }
-
-    dprintf("faulting myself..\n");
-
-    asm volatile ("int $0x3");
-
-    // uintptr_t pages[1024];
-    // for (int i = 0; i < 1024; i++) {
-    //     pages[i] = (uintptr_t)pmm_alloc_pages(5);
-    //     if (!pages[i]) {
-    //         dprintf("Failed at index %d\n", i);
-    //         break;
-    //     }
-    //     dprintf("allocated [%d]: 0x%016lx\n", i, pages[i]);
-    // }
-
-    // for (int i = 0; i < 1024; i++) {
-    //     if (pages[i]) pmm_free_pages((void*)pages[i], 5);
-    // }
-
     void *ptr1 = pmm_alloc_pages(0);
     void *ptr2 = pmm_alloc_pages(0);
     dprintf("alloc: %p\n", ptr1);
@@ -80,9 +54,13 @@ void generic_entry(boot_info_t* boot_info) {
         kfree(buf);
     }
 
+    dprintf("allocating %dB\n", 1024 * 1024 * 3);
+
     char *buf2 = kmalloc(1024 * 1024 * 3);
     strcpy(buf2, "shimoe koharu");
     assert(strcmp(buf2, "shimoe koharu") == 0);
+
+    dprintf("allocating %dB\n", 1024 * 512);
 
     char *buf3 = kmalloc(1024 * 512);
     strcpy(buf3, "shimoe koharu");

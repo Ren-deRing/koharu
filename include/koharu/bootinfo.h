@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define MMAP_TYPE_USABLE                 1
@@ -32,8 +33,15 @@ typedef struct {
 } __attribute__((packed)) boot_mmap_info_t;
 
 typedef struct {
+    uint64_t kernel_src;
+    size_t kernel_size;
+} __attribute__((packed)) boot_kernel_info_t;
+
+typedef struct {
     vbe_screen screen;
     boot_mmap_info_t memory;
+
+    boot_kernel_info_t kernel;
     uint64_t initrd_addr;
 } __attribute__((packed)) boot_info_t;
 

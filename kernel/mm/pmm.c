@@ -96,7 +96,6 @@ void* pmm_alloc_pages(int order) {
 
         g_pmm.free_pages -= (1ULL << order);
 
-        dprintf("allocated: order %d\n", order);
         return (void*)pfn_to_phys(pfn); // return phys addr
     }
 
