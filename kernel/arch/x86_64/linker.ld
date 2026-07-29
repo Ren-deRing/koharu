@@ -2,7 +2,8 @@ ENTRY(generic_entry)
 
 PHDRS
 {
-    text PT_LOAD;
+    headers PT_PHDR PHDRS;
+    text PT_LOAD FILEHDR PHDRS;
     rodata PT_LOAD;
     data PT_LOAD;
 }
@@ -10,6 +11,8 @@ PHDRS
 SECTIONS
 {
     . = 0xFFFFFFFF82000000;
+
+    . = . + SIZEOF_HEADERS;
     
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 

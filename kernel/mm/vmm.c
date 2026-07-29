@@ -4,6 +4,8 @@
 #include <asm/pmap.h>
 
 int vmm_init() {
+    dprintf("kernel src: 0x%lx\n", g_boot_info->kernel.kernel_src);
+    dprintf("kernel size: %luB\n", g_boot_info->kernel.kernel_size);
 
     return 0;
 }

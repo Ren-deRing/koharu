@@ -340,7 +340,7 @@ void loader_entry() {
     boot_info.memory.max_phys_addr = get_mem_size(true);
     boot_info.memory.entries       = (mmap_entry_t*)0xFFFF800000008000ULL;
     boot_info.memory.count         = *(uint8_t *)0xFFFF800000006FFFULL;
-    boot_info.kernel.kernel_src    = (uint64_t)kernel_src;
+    boot_info.kernel.kernel_src    = 0xFFFFFFFF82000000ULL;
     boot_info.kernel.kernel_size   = kernel_size;
     boot_info.initrd_addr          = (uint64_t)initrd_src;
 
