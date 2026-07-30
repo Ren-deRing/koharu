@@ -244,6 +244,24 @@ typedef struct {
     uint64_t initrd_addr;
 } __attribute__((packed)) boot_info_t;
 
+static uint8_t boot_kernel_stack[16384] __attribute__((aligned(16)));
+
+void jump_main(uint64_t entry, boot_info_t *boot_info) {
+    uintptr_t stack_top = (uintptr_t)boot_kernel_stack + sizeof(boot_kernel_stack);
+    uintptr_t virt_stack_top = 0xFFFF800000000000ULL + stack_top;
+
+    __asm__ __volatile__(
+        "mov %0, %%rsp\n\t"
+        "mov %0, %%rbp\n\t"
+        "jmp *%1\n\t"
+        :
+        : "r" (virt_stack_top), "r" (entry), "D" (boot_info)
+        : "memory"
+    );
+
+    hlt();
+}
+
 void loader_entry() {
     uint8_t *vbe_base = (uint8_t *)0x5F00;
 
@@ -331,6 +349,7 @@ void loader_entry() {
     dprintf("initrd loaded at: 0x%lx\n", initrd_src);
 
     add_mmap_entry_split((uint64_t)initrd_src - 0xFFFF800000000000ULL, initrd_size, 6);
+    add_mmap_entry_split((uint64_t)kernel_src - 0xFFFF800000000000ULL, kernel_size, 5);
 
     boot_info_t boot_info;
     memset(&boot_info, 0, sizeof(boot_info_t));
@@ -340,14 +359,11 @@ void loader_entry() {
     boot_info.memory.max_phys_addr = get_mem_size(true);
     boot_info.memory.entries       = (mmap_entry_t*)0xFFFF800000008000ULL;
     boot_info.memory.count         = *(uint8_t *)0xFFFF800000006FFFULL;
-    boot_info.kernel.kernel_src    = 0xFFFFFFFF82000000ULL;
+    boot_info.kernel.kernel_src    = (uint64_t)kernel_src;
     boot_info.kernel.kernel_size   = kernel_size;
     boot_info.initrd_addr          = (uint64_t)initrd_src;
 
-    void (*kernel_entry)(boot_info_t*) = (void (*)(boot_info_t*))ehdr->e_entry;
-
-    dprintf("jumping to kernel.....\n");
-    kernel_entry(&boot_info);
+    jump_main(ehdr->e_entry,  &boot_info);
 
     hlt();
 }

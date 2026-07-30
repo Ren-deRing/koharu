@@ -1,12 +1,36 @@
 #include <koharu/cpu.h>
 #include <koharu/initcall.h>
+#include <koharu/mmu.h>
 
 #include <stdint.h>
+
+#define IA32_EFER_MSR 0xC0000080
+#define EFER_NXE      (1ULL << 11)
 
 struct cpu cpus[MAX_CPUS];
 
 void arch_halt() {
     asm volatile ("hlt");
+}
+
+static inline uint64_t rdmsr(uint32_t msr) {
+    uint32_t low, high;
+    __asm__ __volatile__(
+        "rdmsr"
+        : "=a"(low), "=d"(high)
+        : "c"(msr)
+    );
+    return ((uint64_t)high << 32) | low;
+}
+
+static inline void wrmsr(uint32_t msr, uint64_t val) {
+    uint32_t low = (uint32_t)val;
+    uint32_t high = (uint32_t)(val >> 32);
+    __asm__ __volatile__(
+        "wrmsr"
+        :
+        : "c"(msr), "a"(low), "d"(high)
+    );
 }
 
 static inline uint32_t get_apic_id(void) {
@@ -50,4 +74,13 @@ int init_percpu() {
     return 0;
 }
 
+int enable_nx(void) { // Non-Executable
+    uint64_t efer = rdmsr(IA32_EFER_MSR);
+    efer |= EFER_NXE;
+    wrmsr(IA32_EFER_MSR, efer);
+
+    return 0;
+}
+
 early_initcall(init_percpu, A2);
+early_initcall(enable_nx, A3);
