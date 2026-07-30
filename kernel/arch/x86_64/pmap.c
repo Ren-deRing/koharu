@@ -53,13 +53,13 @@ pmap_t* pmap_kernel(void) {
 }
 
 pmap_t* pmap_create(void) {
-    pmap_t *pmap = kmalloc(sizeof(pmap_t));
+    pmap_t *pmap = kmalloc(sizeof(pmap_t)); // allocate new pmap
     if (!pmap) return NULL;
 
-    uintptr_t pml4_phys = (uintptr_t)pmm_alloc_pages(0);
+    uintptr_t pml4_phys = (uintptr_t)pmm_alloc_pages(0); // allocate new phys page
     pml4e_t *pml4_virt = (pml4e_t*)phys_to_virt(pml4_phys);
 
-    memset(pml4_virt, 0, PAGE_SIZE);
+    memset(pml4_virt, 0, PAGE_SIZE); // clean the page
 
     pmap->pm_root_phys = pml4_phys;
     pmap->pm_root_virt = pml4_virt;
@@ -128,9 +128,9 @@ static int pmap_map_page(pmap_t *pmap, uintptr_t va, uintptr_t pa, uint32_t flag
 int pmap_map(pmap_t *pmap, uintptr_t virt, uintptr_t phys, size_t size, uint32_t flags) {
     if (!pmap || size == 0) return -1;
 
-    uintptr_t va_start = virt & ~0xFFFULL;
-    uintptr_t va_end = (virt + size + 0xFFF) & ~0xFFFULL;
-    uintptr_t pa = phys & ~0xFFFULL;
+    uintptr_t va_start = virt & ~0xFFFULL;                 // 4KB align down (page's start addr)
+    uintptr_t va_end = (virt + size + 0xFFF) & ~0xFFFULL;  // 4KB align up   (end boundary addr for loop)
+    uintptr_t pa = phys & ~0xFFFULL;                       // 4KB align down (phys page's start addr)
 
     for (uintptr_t va = va_start; va < va_end; va += PAGE_SIZE, pa += PAGE_SIZE) {
         int err = pmap_map_page(pmap, va, pa, flags);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <koharu/list.h>
+
 typedef enum ipc_endpoint_state {
     IPC_EP_INACTIVE,
     IPC_EP_WAIT_SEND,  // Clients waiting

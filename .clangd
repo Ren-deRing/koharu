@@ -1,5 +1,12 @@
+If:
+  PathMatch: .*\.h
+
 CompileFlags:
-  Add: [-Iinclude, -ffreestanding]
+  Add:
+    - "-Iinclude"
+    - "-Ikernel/arch/x86_64/include"
+    - "-I../include"
+    - "-I../kernel/arch/x86_64/include"
 
 Style:
   AngledHeaders:

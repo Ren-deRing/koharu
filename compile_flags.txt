@@ -1,3 +1,0 @@
--Iinclude
--Ikernel/arch/x86_64/include
--ffreestanding
