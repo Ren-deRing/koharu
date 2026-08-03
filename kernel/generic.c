@@ -65,6 +65,8 @@ void generic_entry(boot_info_t* boot_info) {
     char *buf3 = kmalloc(1024 * 512);
     strcpy(buf3, "shimoe koharu");
     assert(strcmp(buf3, "shimoe koharu") == 0);
+    
+    dprintf("rsdp: %lx\n", g_boot_info->initrd_addr);
 
     for (;;) arch_halt();
 }

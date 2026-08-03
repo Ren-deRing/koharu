@@ -43,6 +43,7 @@ typedef struct {
 
     boot_kernel_info_t kernel;
     uint64_t initrd_addr;
+    uint64_t rsdp_addr;
 } __attribute__((packed)) boot_info_t;
 
 extern boot_info_t* g_boot_info;

@@ -116,6 +116,36 @@ uint64_t get_mem_size(bool is_max_addr) {
     return is_max_addr ? max_addr : total_size; 
 }
 
+uint8_t *scan_rsdp(uint8_t *base, size_t length) {
+    for (size_t i = 0; i < length; i += 16) {
+        // rsdp checksum
+        if (memcmp(base + i, "RSD PTR ", 8) == 0) {
+            // acpi 2.0+ checksum (sum(first 36B) = 0)
+            uint8_t sum = 0;
+            for (int j = 0; j < 36; j++) {
+                sum += base[i + j];
+            }
+            if (sum == 0) return base + i;
+        }
+    }
+    return NULL;
+}
+
+uint64_t get_rsdp_addr() {
+    uint16_t ebda_seg = *(volatile uint16_t *)(0xFFFF800000000000ULL + 0x040E);
+    uint8_t *ebda_virt = (uint8_t *)(((uintptr_t)ebda_seg << 4) + 0xFFFF800000000000ULL);
+    
+    // EBDA
+    uint8_t *rsdp = scan_rsdp(ebda_virt, 1024);
+    if (rsdp) return (uint64_t)rsdp;
+
+    // main BIOS ROM
+    uint8_t *bios_virt = (uint8_t *)(0xE0000ULL + 0xFFFF800000000000ULL);
+    rsdp = scan_rsdp(bios_virt, 0x20000);
+    
+    return rsdp ? (uint64_t)rsdp : 0;
+}
+
 void add_mmap_entry_split(uint64_t new_base, uint64_t new_len, uint32_t new_type) {
     volatile mmap_entry_t* mmap = (volatile mmap_entry_t*)(uintptr_t)0xFFFF800000008000ULL;
     uint8_t *count_ptr = (uint8_t *)0xFFFF800000006FFFULL;
@@ -242,6 +272,7 @@ typedef struct {
     kernel_info_t kernel;
 
     uint64_t initrd_addr;
+    uint64_t rsdp_addr;
 } __attribute__((packed)) boot_info_t;
 
 static uint8_t boot_kernel_stack[16384] __attribute__((aligned(16)));
@@ -255,7 +286,7 @@ void jump_main(uint64_t entry, boot_info_t *boot_info) {
         "mov %0, %%rbp\n\t"
         "jmp *%1\n\t"
         :
-        : "r" (virt_stack_top), "r" (entry), "D" (boot_info)
+        : "r" (virt_stack_top), "r" (entry), "D" ((uint64_t)boot_info + 0xFFFF800000000000ULL)
         : "memory"
     );
 
@@ -351,7 +382,7 @@ void loader_entry() {
     add_mmap_entry_split((uint64_t)initrd_src - 0xFFFF800000000000ULL, initrd_size, 6);
     add_mmap_entry_split((uint64_t)kernel_src - 0xFFFF800000000000ULL, kernel_size, 5);
 
-    boot_info_t boot_info;
+    static boot_info_t boot_info;
     memset(&boot_info, 0, sizeof(boot_info_t));
 
     boot_info.screen               = screen;
@@ -362,6 +393,7 @@ void loader_entry() {
     boot_info.kernel.kernel_src    = (uint64_t)kernel_src;
     boot_info.kernel.kernel_size   = kernel_size;
     boot_info.initrd_addr          = (uint64_t)initrd_src;
+    boot_info.rsdp_addr            = get_rsdp_addr();
 
     jump_main(ehdr->e_entry,  &boot_info);
 

@@ -22,7 +22,7 @@ typedef struct {
 } __attribute__((packed)) idtr_t;
 
 void isr_handler(struct trapframe *tf) {
-    dprintf("\nPANIC! [#%02lu]\n", tf->vector);
+    dprintf("\nPANIC! [#%02lu] [E%lu]\n", tf->vector, tf->error);
     dprintf("  CS:RIP = 0x%04lx:0x%016lx\n", tf->cs, tf->rip);
     dprintf("  RAX:     0x%016lx  RBX: 0x%016lx\n", tf->rax, tf->rbx);
     dprintf("  RCX:     0x%016lx  RDX: 0x%016lx\n", tf->rcx, tf->rdx);
