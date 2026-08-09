@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import struct
+import shutil
 
 build_dir = sys.argv[1]
 source_dir = sys.argv[2]
@@ -11,23 +12,35 @@ os.makedirs(initrd_dir, exist_ok=True)
 
 subprocess.run(f"cd {source_dir}/initrd && (find . -type d && find . -type f) | cpio -o -H newc > {build_dir}/initrd.cpio", shell=True, check=True)
 
-bootbin_dir = f"{build_dir}/bootbin_tmp"
-os.makedirs(bootbin_dir, exist_ok=True)
-subprocess.run(f"cp {build_dir}/kernel/kernel.elf {bootbin_dir}/", shell=True, check=True)
-subprocess.run(f"cp {build_dir}/initrd.cpio {bootbin_dir}/", shell=True, check=True)
-subprocess.run(f"cd {bootbin_dir} && (find . -type d && find . -type f) | cpio -o -H newc > {build_dir}/bootbin.cpio", shell=True, check=True)
+esp_dir = os.path.join(build_dir, "esp_root")
+if os.path.exists(esp_dir):
+    shutil.rmtree(esp_dir)
 
-boot_bin = open(f"{build_dir}/boot/boot.bin", "rb").read()
-bootloader_bin = open(f"{build_dir}/boot/bootloader.bin", "rb").read()
-bootbin_cpio = open(f"{build_dir}/bootbin.cpio", "rb").read()
+boot_dir = os.path.join(esp_dir, "EFI", "BOOT")
+os.makedirs(boot_dir, exist_ok=True)
 
-temp_img = (boot_bin + bootloader_bin).ljust(40 * 512, b'\x00') # 40 Sectors
+shutil.copy(os.path.join(build_dir, "boot", "BOOTX64.EFI"), boot_dir)
+shutil.copy(os.path.join(build_dir, "kernel", "kernel.elf"), esp_dir)
+shutil.copy(os.path.join(build_dir, "initrd.cpio"), esp_dir)
 
-sector_count = (len(bootbin_cpio) + 511) // 512
-header = bytes.fromhex("8014fac0") + struct.pack("<H", sector_count) + b"\x00\x00"
-header = header.ljust(512, b'\x00')
+fat_img = os.path.join(build_dir, "fat.img")
+if os.path.exists(fat_img):
+    os.remove(fat_img)
 
-with open(f"{build_dir}/disk.img", "wb") as f:
-    f.write(temp_img[:40*512]) # Sector 0~39
-    f.write(header)            # Sector 40
-    f.write(bootbin_cpio)      # Sector 41~
+with open(fat_img, "wb") as f:
+    f.truncate(62 * 1024 * 1024)
+
+subprocess.run(f"mformat -i {fat_img} -F ::", shell=True, check=True)
+subprocess.run(f"mcopy -i {fat_img} -s {esp_dir}/* ::/", shell=True, check=True)
+
+disk_img = os.path.join(build_dir, "disk.img")
+if os.path.exists(disk_img):
+    os.remove(disk_img)
+
+with open(disk_img, "wb") as f:
+    f.truncate(64 * 1024 * 1024)
+
+subprocess.run(f"sfdisk --no-reread {disk_img} <<EOF\nlabel: gpt\nstart=2048, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B\nEOF",
+    shell=True, check=True, stdout=subprocess.DEVNULL)
+subprocess.run(f"dd if={fat_img} of={disk_img} bs=512 seek=2048 conv=notrunc", shell=True, check=True)
+os.remove(fat_img)

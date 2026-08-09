@@ -2,8 +2,7 @@
 #include <koharu/elf.h>
 #include <koharu/initcall.h>
 #include <koharu/string.h>
-
-#include <asm/pmap.h>
+#include <koharu/pmap.h>
 
 #include <koharu/mmu.h>
 #include <stdbool.h>

@@ -4,3 +4,4 @@
 *.bin
 *.cpio
 *.d
+.wraplock

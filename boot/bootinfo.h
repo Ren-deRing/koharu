@@ -1,7 +1,6 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
+#include <uefi.h>
 
 #define MMAP_TYPE_USABLE                 1
 #define MMAP_TYPE_RESERVED               2
@@ -50,5 +49,3 @@ typedef struct {
     uint64_t initrd_addr;
     uint64_t rsdp_addr;
 } __attribute__((packed)) boot_info_t;
-
-extern boot_info_t* g_boot_info;

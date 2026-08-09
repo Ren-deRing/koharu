@@ -1,0 +1,8 @@
+[wrap-git]
+url = https://gitlab.com/bztsrc/posix-uefi.git
+revision = head
+depth = 1
+patch_directory = posix-uefi
+
+[provide]
+dependency_names = posix-uefi

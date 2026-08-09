@@ -18,6 +18,7 @@ kernel_sources = files(
   'mm/vmm.c',
   'misc/kpanic.c',
   'misc/kprintf.c',
+  'dev/acpi.c',
   'arch/x86_64/cpu.c',
   'arch/x86_64/idt.c',
   'arch/x86_64/pmap.c',
