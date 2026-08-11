@@ -10,7 +10,21 @@ source_dir = sys.argv[2]
 initrd_dir = os.path.join(source_dir, "initrd")
 os.makedirs(initrd_dir, exist_ok=True)
 
-subprocess.run(f"cd {source_dir}/initrd && (find . -type d && find . -type f) | cpio -o -H newc > {build_dir}/initrd.cpio", shell=True, check=True)
+initrd_cpio_path = os.path.join(build_dir, "initrd.cpio")
+subprocess.run(f"cd {source_dir}/initrd && find . -mindepth 1 -printf '%P\\n' | cpio -o -H newc > {initrd_cpio_path}", shell=True, check=True)
+
+bootbin_dir = os.path.join(build_dir, "bootbin_dir")
+if os.path.exists(bootbin_dir):
+    shutil.rmtree(bootbin_dir)
+os.makedirs(bootbin_dir, exist_ok=True)
+
+shutil.copy(os.path.join(build_dir, "kernel", "kernel.elf"), bootbin_dir)
+shutil.copy(initrd_cpio_path, bootbin_dir)
+
+bootbin_cpio_path = os.path.join(build_dir, "bootbin.cpio")
+subprocess.run(f"cd {bootbin_dir} && find . -mindepth 1 -printf '%P\\n' | cpio -o -H newc > {bootbin_cpio_path}", shell=True, check=True)
+
+shutil.rmtree(bootbin_dir)
 
 esp_dir = os.path.join(build_dir, "esp_root")
 if os.path.exists(esp_dir):
@@ -20,8 +34,7 @@ boot_dir = os.path.join(esp_dir, "EFI", "BOOT")
 os.makedirs(boot_dir, exist_ok=True)
 
 shutil.copy(os.path.join(build_dir, "boot", "BOOTX64.EFI"), boot_dir)
-shutil.copy(os.path.join(build_dir, "kernel", "kernel.elf"), esp_dir)
-shutil.copy(os.path.join(build_dir, "initrd.cpio"), esp_dir)
+shutil.copy(bootbin_cpio_path, esp_dir)
 
 fat_img = os.path.join(build_dir, "fat.img")
 if os.path.exists(fat_img):

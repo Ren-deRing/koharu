@@ -131,87 +131,87 @@ void pmm_free_pages(void* addr, int order) {
     g_pmm.free_pages += (1ULL << order);
 }
 
-// int pmm_init() {
-//     g_pmm.free_pages = 0;
+int pmm_init() {
+    g_pmm.free_pages = 0;
     
-//     for (int i = 0; i < MAX_BUDDY_ORDER; i++) {
-//         g_pmm.orders[i].free_count = 0;
-//         list_init(&g_pmm.orders[i].free_list);
-//     }
+    for (int i = 0; i < MAX_BUDDY_ORDER; i++) {
+        g_pmm.orders[i].free_count = 0;
+        list_init(&g_pmm.orders[i].free_list);
+    }
 
-//     // mem map size....
-//     g_pmm.total_pages = ALIGN_UP(g_boot_info->memory.max_phys_addr, PAGE_SIZE) / PAGE_SIZE;
-//     size_t array_size = ALIGN_UP(g_pmm.total_pages * sizeof(page_t), PAGE_SIZE);
+    // mem map size....
+    g_pmm.total_pages = ALIGN_UP(g_boot_info->memory.max_phys_addr, PAGE_SIZE) / PAGE_SIZE;
+    size_t array_size = ALIGN_UP(g_pmm.total_pages * sizeof(page_t), PAGE_SIZE);
 
-//     // mem map is located in a free region of ​​sufficient size
-//     mmap_entry_t *mmap = g_boot_info->memory.entries;
-//     uint32_t count = g_boot_info->memory.count;
-//     uintptr_t array_phys = 0;
+    // mem map is located in a free region of ​​sufficient size
+    mmap_entry_t *mmap = g_boot_info->memory.entries;
+    uint32_t count = g_boot_info->memory.count;
+    uintptr_t array_phys = 0;
 
-//     for (size_t i = 0; i < count; i++) {
-//         if (mmap[i].type == MMAP_TYPE_USABLE) {
-//             uintptr_t start_addr = ALIGN_UP(mmap[i].phys_start, PAGE_SIZE);
-//             uintptr_t end_addr = ALIGN_UP(mmap[i].phys_start + mmap[i].length, PAGE_SIZE);
+    for (size_t i = 0; i < count; i++) {
+        if (mmap[i].type == MMAP_TYPE_USABLE) {
+            uintptr_t start_addr = ALIGN_UP(mmap[i].phys_start, PAGE_SIZE);
+            uintptr_t end_addr = ALIGN_UP(mmap[i].phys_start + mmap[i].length, PAGE_SIZE);
 
-//             if (start_addr < 0x100000ULL) {
-//                 start_addr = 0x100000ULL;
-//             }
+            if (start_addr < 0x100000ULL) {
+                start_addr = 0x100000ULL;
+            }
 
-//             if (end_addr > start_addr && (end_addr - start_addr) >= array_size) {
-//                 array_phys = start_addr;
-//                 break;
-//             }
-//         }
-//     }
+            if (end_addr > start_addr && (end_addr - start_addr) >= array_size) {
+                array_phys = start_addr;
+                break;
+            }
+        }
+    }
 
-//     if (!array_phys || array_phys == 0) return -1; // oh no...
+    if (!array_phys || array_phys == 0) return -1; // oh no...
 
-//     g_pmm.mem_map_phys = array_phys;
-//     g_pmm.mem_map_size = array_size;
-//     g_pmm.mem_map = (page_t*)(array_phys + HHDM_OFFSET);
+    g_pmm.mem_map_phys = array_phys;
+    g_pmm.mem_map_size = array_size;
+    g_pmm.mem_map = (page_t*)(array_phys + HHDM_OFFSET);
 
-//     memset(g_pmm.mem_map, 0, array_size);
+    memset(g_pmm.mem_map, 0, array_size);
 
-//     uintptr_t array_end = array_phys + array_size;
+    uintptr_t array_end = array_phys + array_size;
 
-//     for (uint64_t i = 0; i < count; i++) {
-//         if (mmap[i].type == MMAP_TYPE_USABLE) {
-//             uintptr_t curr = ALIGN_UP(mmap[i].base_addr, PAGE_SIZE);
-//             uintptr_t end = ALIGN_DOWN(mmap[i].base_addr + mmap[i].length, PAGE_SIZE);
+    for (uint64_t i = 0; i < count; i++) {
+        if (mmap[i].type == MMAP_TYPE_USABLE) {
+            uintptr_t curr = ALIGN_UP(mmap[i].phys_start, PAGE_SIZE);
+            uintptr_t end = ALIGN_DOWN(mmap[i].phys_start + mmap[i].length, PAGE_SIZE);
 
-//             while (curr < end) {
-//                 if (curr >= array_phys && curr < array_end) { // if curr is in a mem map array
-//                     curr = array_end;
-//                     continue;
-//                 }
+            while (curr < end) {
+                if (curr >= array_phys && curr < array_end) { // if curr is in a mem map array
+                    curr = array_end;
+                    continue;
+                }
 
-//                 uintptr_t limit = end;
-//                 if (curr < array_phys && end > array_phys) limit = array_phys; // don't overlap me..
+                uintptr_t limit = end;
+                if (curr < array_phys && end > array_phys) limit = array_phys; // don't overlap me..
 
-//                 size_t remain = limit - curr;
-//                 int target_order = 0; // zerokara
+                size_t remain = limit - curr;
+                int target_order = 0; // zerokara
 
-//                 for (int order = MAX_BUDDY_ORDER - 1; order >= 0; order--) {
-//                     size_t block_size = 1ULL << (PAGE_SHIFT + order);
-//                     if (remain >= block_size && (curr & (block_size - 1)) == 0) {
-//                         target_order = order; // if addr is aligend to block
-//                         break;                // and the size is smaller than block size
-//                     }
-//                 }
+                for (int order = MAX_BUDDY_ORDER - 1; order >= 0; order--) {
+                    size_t block_size = 1ULL << (PAGE_SHIFT + order);
+                    if (remain >= block_size && (curr & (block_size - 1)) == 0) {
+                        target_order = order; // if addr is aligend to block
+                        break;                // and the size is smaller than block size
+                    }
+                }
 
-//                 size_t pfn = phys_to_pfn(curr);
-//                 page_t* pg = pfn_to_page(pfn);
-//                 pg->is_free = true;
-//                 list_add_tail(&pg->page_list, &g_pmm.orders[target_order].free_list);
-//                 g_pmm.orders[target_order].free_count++;
-//                 g_pmm.free_pages += 1ULL << target_order;
+                size_t pfn = phys_to_pfn(curr);
+                page_t* pg = pfn_to_page(pfn);
+                pg->is_free = true;
+                list_add_tail(&pg->page_list, &g_pmm.orders[target_order].free_list);
+                g_pmm.orders[target_order].free_count++;
+                g_pmm.free_pages += 1ULL << target_order;
 
-//                 curr += (1ULL << (PAGE_SHIFT + target_order));
-//             }
-//         }
-//     }
+                curr += (1ULL << (PAGE_SHIFT + target_order));
+            }
+        }
+    }
 
-//     return 0;
-// }
+    return 0;
+}
 
-// core_initcall(pmm_init, 0);
+core_initcall(pmm_init, 0);

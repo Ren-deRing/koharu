@@ -24,7 +24,7 @@ typedef struct {
 
 typedef struct {
     uint64_t phys_start;
-    uint64_t page_count;
+    uint64_t length;
     uint32_t type;
     uint32_t flags;
 } __attribute__((packed)) mmap_entry_t;

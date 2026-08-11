@@ -24,7 +24,6 @@ void _npf_putc(int c, void* ctx) {
 }
 
 void dprintf(const char* fmt, ...) {
-    char buffer[256];
     va_list args;
     va_start(args, fmt);
 

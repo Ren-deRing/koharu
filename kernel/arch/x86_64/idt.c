@@ -31,9 +31,7 @@ void isr_handler(struct trapframe *tf) {
 
     if (tf->vector != 3) {
         dprintf("oh no, halting.\n");
-        for (;;) {
-            arch_halt();
-        }
+        for (;;) arch_halt();
     }
 
     dprintf("that was not a panic.\n\n");

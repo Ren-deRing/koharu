@@ -19,4 +19,4 @@ int acpi_init() {
     return 0;
 }
 
-// arch_initcall(acpi_init, 0);
+arch_initcall(acpi_init, 0);

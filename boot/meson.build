@@ -1,6 +1,6 @@
 posix_uefi_dep = dependency('posix-uefi')
 
-boot_sources = files('main.c')
+boot_sources = files('main.c', 'loader.c', 'arch/x86_64/hhdm.c', 'arch/x86_64/jump.c')
 
 boot_c_args = [
   '-target', 'x86_64-unknown-windows',

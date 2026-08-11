@@ -16,13 +16,6 @@ __attribute__((section("entry")))
 void generic_entry(boot_info_t* boot_info) {
     g_boot_info = boot_info;
 
-    volatile uint32_t* fb = boot_info->framebuffer.address;
-    uint32_t total_pixels = (boot_info->framebuffer.pitch / 4) * boot_info->framebuffer.height;
-    
-    for (uint32_t i = 0; i < total_pixels; i++) {
-        fb[i] = 0xCC9BA3; // KOHARU
-    }
-
     run_initcalls(__early_initcall_start, __early_initcall_end);
     run_initcalls(__core_initcall_start, __core_initcall_end);
     run_initcalls(__arch_initcall_start, __arch_initcall_end);
@@ -65,8 +58,6 @@ void generic_entry(boot_info_t* boot_info) {
     char *buf3 = kmalloc(1024 * 512);
     strcpy(buf3, "shimoe koharu");
     assert(strcmp(buf3, "shimoe koharu") == 0);
-    
-    dprintf("rsdp: %lx\n", g_boot_info->rsdp_addr);
 
     for (;;) arch_halt();
 }
