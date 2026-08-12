@@ -30,3 +30,5 @@ typedef struct {
     acpi_sdt_header_t header;
     uint64_t tables[];
 } __attribute__((packed)) acpi_xsdt_t;
+
+acpi_sdt_header_t *acpi_find_table(const char signature[4]);

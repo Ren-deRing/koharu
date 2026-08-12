@@ -1,4 +1,3 @@
-#include "koharu/print.h"
 #include <koharu/cpu.h>
 #include <koharu/initcall.h>
 #include <koharu/mmu.h>
@@ -35,7 +34,7 @@ void arch_halt() {
     asm volatile ("hlt");
 }
 
-static inline uint64_t rdmsr(uint32_t msr) {
+uint64_t rdmsr(uint32_t msr) {
     uint32_t low, high;
     __asm__ __volatile__(
         "rdmsr"
@@ -45,7 +44,7 @@ static inline uint64_t rdmsr(uint32_t msr) {
     return ((uint64_t)high << 32) | low;
 }
 
-static inline void wrmsr(uint32_t msr, uint64_t val) {
+void wrmsr(uint32_t msr, uint64_t val) {
     uint32_t low = (uint32_t)val;
     uint32_t high = (uint32_t)(val >> 32);
     __asm__ __volatile__(
@@ -171,6 +170,24 @@ int enable_fsgsbase(void) {
     return 0;
 }
 
+int enable_x2apic(void) {
+    uint32_t eax, ebx, ecx, edx;
+
+    cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+    if (!(ecx & (1 << 21))) return -1;
+
+    uint64_t apic_base = rdmsr(0x1B);
+
+    if ((apic_base & (3ULL << 10)) == (3ULL << 10)) {
+        return 0;
+    }
+
+    apic_base |= (1ULL << 11) | (1ULL << 10); // Enable & x2APIC Mode
+    wrmsr(0x1B, apic_base);
+
+    return 0;
+}
+
 int set_tsc_frequency(void) {
     uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
 
@@ -230,4 +247,5 @@ early_initcall(enable_nx, A3);
 early_initcall(enable_pge, A4);
 early_initcall(enable_xsaves, A5);
 early_initcall(enable_fsgsbase, A6);
-early_initcall(set_tsc_frequency, A7);
+early_initcall(enable_x2apic, A7);
+early_initcall(set_tsc_frequency, A8);

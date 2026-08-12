@@ -1,3 +1,5 @@
+#include <koharu/intc.h>
+#include <koharu/acpi.h>
 #include <koharu/pmap.h>
 #include <koharu/assert.h>
 #include <koharu/cpu.h>
@@ -118,6 +120,8 @@ void generic_entry(boot_info_t* boot_info) {
     pmap_map(test, 0x400000, 0x100000, PAGE_SIZE * 3, PROT_READ | PROT_WRITE | PROT_USER);
     pmap_unmap(test, 0x400000, PAGE_SIZE * 3);
     pmap_destroy(test);
+
+    dprintf("current g_intc implementation: %s\n", g_intc->name);
 
     for (;;) arch_halt();
 }

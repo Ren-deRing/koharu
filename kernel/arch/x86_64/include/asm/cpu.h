@@ -5,3 +5,6 @@
 struct arch_cpu {
     uint32_t xsave_size;
 };
+
+uint64_t rdmsr(uint32_t msr);
+void wrmsr(uint32_t msr, uint64_t val);
