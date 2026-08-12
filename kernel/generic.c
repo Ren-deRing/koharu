@@ -80,6 +80,40 @@ void generic_entry(boot_info_t* boot_info) {
         fb[i] = 0xF2BDCB; // KOHARU (swinsuit)
     }
 
+    if (g_boot_info->init.size > 0) {
+        const uint8_t *p = (const uint8_t *)g_boot_info->init.addr;
+        uint32_t pw = 0, ph = 0;
+
+        p += 3; // skip "P6\n"
+        while (*p >= '0' && *p <= '9') pw = pw * 10 + *p++ - '0';
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        while (*p >= '0' && *p <= '9') ph = ph * 10 + *p++ - '0';
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        while (*p >= '0' && *p <= '9') p++; // skip maxval
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        // data start
+
+        uint32_t fw = boot_info->framebuffer.width;
+        uint32_t fh = boot_info->framebuffer.height;
+        uint32_t fs = boot_info->framebuffer.pitch / 4;
+
+        uint32_t ow = fw, oh = (uint32_t)((uint64_t)ph * fw / pw);
+        if (oh > fh) { oh = fh; ow = (uint32_t)((uint64_t)pw * fh / ph); }
+        int ox = ((int)fw - (int)ow) / 2;
+        int oy = ((int)fh - (int)oh) / 2;
+
+        for (uint32_t y = 0; y < oh; y++) {
+            uint32_t sy = (uint32_t)(((uint64_t)y * ph) / oh);
+            const uint8_t *srow = p + (size_t)sy * pw * 3;
+            uint32_t *row = fb + (size_t)(oy + (int)y) * fs;
+            for (uint32_t x = 0; x < ow; x++) {
+                uint32_t sx = (uint32_t)(((uint64_t)x * pw) / ow);
+                const uint8_t *px = srow + sx * 3;
+                row[ox + (int)x] = ((uint32_t)px[0] << 16) | ((uint32_t)px[1] << 8) | px[2];
+            }
+        }
+    }
+
     pmap_t *test = pmap_create();
     pmap_map(test, 0x400000, 0x100000, PAGE_SIZE * 3, PROT_READ | PROT_WRITE | PROT_USER);
     pmap_unmap(test, 0x400000, PAGE_SIZE * 3);

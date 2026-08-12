@@ -146,8 +146,18 @@ efi_status_t load_bootbin(boot_info_t *boot_info) {
         return status;
     }
 
+    uint64_t init_base = 0;
+    size_t init_size = 0;
+    status = cpio_extract((void *)initrd_base, "koharu.ppm", &init_base, &init_size); // for now.
+    if (EFI_ERROR(status)) {
+        init_base = 0;
+        init_size = 0;
+    }
+
     boot_info->kernel.kernel_src  = kernel_base;
     boot_info->kernel.kernel_size = kernel_size;
+    boot_info->init.addr          = init_base;
+    boot_info->init.size          = init_size;
     boot_info->initrd_addr        = initrd_base;
 
     return EFI_SUCCESS;

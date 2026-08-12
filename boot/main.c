@@ -221,6 +221,7 @@ int main(int argc, char **argv) {
 
     g_boot_info.memory.entries      = (mmap_entry_t*)(0xFFFF800000000000ULL + (uint64_t)g_boot_info.memory.entries);
     g_boot_info.kernel.kernel_src   = 0xFFFF800000000000ULL + g_boot_info.kernel.kernel_src;
+    g_boot_info.init.addr           = 0xFFFF800000000000ULL + g_boot_info.init.addr;
     g_boot_info.initrd_addr         = 0xFFFF800000000000ULL + g_boot_info.initrd_addr;
     g_boot_info.rsdp_addr           = 0xFFFF800000000000ULL + g_boot_info.rsdp_addr;
     g_boot_info.framebuffer.address = (uint32_t*)((uint64_t)g_boot_info.framebuffer.address + 0xFFFF800000000000ULL);
