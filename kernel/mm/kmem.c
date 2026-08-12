@@ -7,16 +7,18 @@
 #include <string.h>
 
 void* kmalloc(size_t size) {
+    cpu_status_t flags = arch_irq_save();
+
     // fast path
     void *ptr = tlsf_malloc(curcpu->tlsf_ctrl, size);
-    if (ptr) return ptr;
+    if (ptr) { arch_irq_restore(flags); return ptr; }
 
     // slow path
 
     // clear pending list
     tlsf_flush_pending(curcpu);
     ptr = tlsf_malloc(curcpu->tlsf_ctrl, size);
-    if (ptr) return ptr;
+    if (ptr) { arch_irq_restore(flags); return ptr; }
 
     // buddy! help me!
     size_t alloc_bytes = size + 64; // margin
@@ -26,7 +28,7 @@ void* kmalloc(size_t size) {
     size_t order = (req_order < 4) ? 4 : req_order; // maintain min order (4)
 
     void *phys_ptr = pmm_alloc_pages(order); // BUDDY!
-    if (!phys_ptr && (uintptr_t)phys_ptr == 0) return NULL; // OOM
+    if (!phys_ptr && (uintptr_t)phys_ptr == 0) { arch_irq_restore(flags); return NULL; } // OOM
 
     size_t page_count = 1ULL << order;
     size_t base_pfn = phys_to_pfn((uintptr_t)phys_ptr);
@@ -42,22 +44,27 @@ void* kmalloc(size_t size) {
 
     tlsf_add_pool(curcpu->tlsf_ctrl, pool_ptr, pool_bytes);
 
+    arch_irq_restore(flags);
     return tlsf_malloc(curcpu->tlsf_ctrl, size);
 }
 
 void kfree(void *ptr) {
     if (!ptr) return;
     
+    cpu_status_t flags = arch_irq_save();
+
     page_t *page = virt_to_page(ptr);
     struct cpu *owner = id_to_cpu(page->owner_cpu_id);
 
     if (curcpu == owner) { // if it's my heap
         tlsf_free(curcpu->tlsf_ctrl, ptr); // just free to tlsf pool
+        arch_irq_restore(flags);
         return;
     }
 
     // not my heap? pass the work off to owner
     tlsf_push_pending(owner, ptr);
+    arch_irq_restore(flags);
 }
 
 int percpu_tlsf_init(void) {
