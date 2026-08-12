@@ -1,3 +1,4 @@
+#include <koharu/pmap.h>
 #include <koharu/assert.h>
 #include <koharu/cpu.h>
 #include <koharu/initcall.h>
@@ -58,6 +59,31 @@ void generic_entry(boot_info_t* boot_info) {
     char *buf3 = kmalloc(1024 * 512);
     strcpy(buf3, "shimoe koharu");
     assert(strcmp(buf3, "shimoe koharu") == 0);
+
+    uint32_t* fb = boot_info->framebuffer.address;
+
+    pmap_map(pmap_kernel(), (uint64_t)fb, virt_to_phys(fb),
+        (g_boot_info->framebuffer.height * g_boot_info->framebuffer.pitch), PROT_READ | PROT_WRITE | PROT_WC | PROT_GLOBAL);
+
+    uint32_t total_pixels = (boot_info->framebuffer.pitch / 4) * boot_info->framebuffer.height;
+    
+    for (uint32_t i = 0; i < total_pixels; i++) {
+        fb[i] = 0xCC9BA3; // KOHARU
+    }
+
+    pmap_unmap(pmap_kernel(), (uint64_t)fb, (g_boot_info->framebuffer.height * g_boot_info->framebuffer.pitch));
+
+    pmap_map(pmap_kernel(), (uint64_t)fb, virt_to_phys(fb),
+        (g_boot_info->framebuffer.height * g_boot_info->framebuffer.pitch), PROT_READ | PROT_WRITE | PROT_WC | PROT_GLOBAL);
+
+    for (uint32_t i = 0; i < total_pixels; i++) {
+        fb[i] = 0xF2BDCB; // KOHARU (swinsuit)
+    }
+
+    pmap_t *test = pmap_create();
+    pmap_map(test, 0x400000, 0x100000, PAGE_SIZE * 3, PROT_READ | PROT_WRITE | PROT_USER);
+    pmap_unmap(test, 0x400000, PAGE_SIZE * 3);
+    pmap_destroy(test);
 
     for (;;) arch_halt();
 }

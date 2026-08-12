@@ -82,5 +82,15 @@ int enable_nx(void) { // Non-Executable
     return 0;
 }
 
+int enable_pge(void) { // Page Global
+    uintptr_t cr4;
+    asm volatile("mov %%cr4, %0" : "=r"(cr4));
+    cr4 |= (1ULL << 7); // PGE
+    asm volatile("mov %0, %%cr4" :: "r"(cr4));
+
+    return 0;
+}
+
 early_initcall(init_percpu, A2);
 early_initcall(enable_nx, A3);
+early_initcall(enable_pge, A4);

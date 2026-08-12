@@ -50,7 +50,7 @@ int vmm_init() {
 
     // first, map entire memory.
     int err = pmap_map(pmap_kernel(), 0xFFFF800000000000ULL, 0,
-       g_boot_info->memory.max_phys_addr, PROT_READ | PROT_WRITE);
+       g_boot_info->memory.max_phys_addr, PROT_READ | PROT_WRITE | PROT_HUGE);
     if (err != 0) return err;
 
     // next, map kernel addr.
