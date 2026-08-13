@@ -1,3 +1,4 @@
+#include <koharu/thread.h>
 #include <koharu/intc.h>
 #include <koharu/acpi.h>
 #include <koharu/pmap.h>
@@ -9,8 +10,6 @@
 #include <koharu/print.h>
 #include <koharu/kmem.h>
 
-#include <stddef.h>
-#include <stdint.h>
 #include <string.h>
 
 boot_info_t* g_boot_info;
@@ -122,6 +121,11 @@ void generic_entry(boot_info_t* boot_info) {
     pmap_destroy(test);
 
     dprintf("current g_intc implementation: %s\n", g_intc->name);
+
+    struct thread *t = thread_create(pmap_create(), (uintptr_t)&generic_entry, boot_info, 0);
+    // anyway, it's a test.
+
+    dprintf("trapframe addr: 0x%lx\n", (uintptr_t)t->tf);
 
     for (;;) arch_halt();
 }

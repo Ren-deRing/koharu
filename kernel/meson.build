@@ -27,6 +27,7 @@ kernel_sources = files(
   'arch/x86_64/io.c',
   'arch/x86_64/irq.S',
   'arch/x86_64/lapic.c',
+  'arch/x86_64/thread.c',
   'lib/tlsf.c',
   'lib/string.c'
 )

@@ -7,6 +7,8 @@
 #include <string.h>
 
 void* kmalloc(size_t size) {
+    if (size == 0) return NULL;
+
     cpu_status_t flags = arch_irq_save();
 
     // fast path
@@ -65,6 +67,26 @@ void kfree(void *ptr) {
     // not my heap? pass the work off to owner
     tlsf_push_pending(owner, ptr);
     arch_irq_restore(flags);
+}
+
+void* kmalloc_aligned(size_t size, size_t alignment) {
+    if (alignment == 0) return NULL;
+
+    void* raw = kmalloc(size + alignment + sizeof(void*));
+    if (!raw) return NULL;
+
+    uintptr_t addr = (uintptr_t)raw + sizeof(void*);
+    uintptr_t rem = addr % alignment;
+    void* aligned = (void*)(addr + (rem ? alignment - rem : 0));
+
+    ((void**)aligned)[-1] = raw;
+    return aligned;
+}
+
+void kfree_aligned(void* ptr) {
+    if (!ptr) return;
+    void* raw = ((void**)ptr)[-1];
+    kfree(raw);
 }
 
 int percpu_tlsf_init(void) {

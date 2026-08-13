@@ -32,7 +32,7 @@ int map_kernel(uint64_t kernel_src) {
         bool is_writeable = (flags & SHF_WRITE) != 0;
         bool is_executable = (flags & SHF_EXECINSTR) != 0;
 
-        uint32_t map_flags = PROT_READ;
+        uint32_t map_flags = PROT_READ | PROT_GLOBAL;
         if (is_writeable)  map_flags |= PROT_WRITE;
         if (is_executable) map_flags |= PROT_EXEC;
 
@@ -50,7 +50,7 @@ int vmm_init() {
 
     // first, map entire memory.
     int err = pmap_map(pmap_kernel(), 0xFFFF800000000000ULL, 0,
-       g_boot_info->memory.max_phys_addr, PROT_READ | PROT_WRITE | PROT_HUGE);
+       g_boot_info->memory.max_phys_addr, PROT_READ | PROT_WRITE | PROT_HUGE | PROT_GLOBAL);
     if (err != 0) return err;
 
     // next, map kernel addr.
