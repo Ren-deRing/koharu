@@ -49,6 +49,27 @@ ERR   29
 ERR   30
 NOERR 31
 
+.altmacro
+i = 32
+.rept 224
+    NOERR %i
+    i = i + 1
+.endr
+
+.macro isr_entry index
+    .quad isr\index
+.endm
+
+isr_stub_table:
+    i = 32
+    .rept 224
+        isr_entry %i
+        i = i + 1
+    .endr
+.noaltmacro
+
+.global isr_stub_table
+
 .macro do_swapgs
     testq $0x3, 24(%rsp)
     jz .L_macro_exit_\@

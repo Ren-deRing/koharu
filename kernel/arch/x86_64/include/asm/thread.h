@@ -3,5 +3,7 @@
 #include <stdint.h>
 
 struct arch_thread {
-    void *xsaves_area;
+    uint64_t rsp;
+    uint64_t fs_base;
+    void    *xsaves_area;
 };

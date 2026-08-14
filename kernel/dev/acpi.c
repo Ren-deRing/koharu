@@ -43,7 +43,7 @@ int acpi_init(void) {
     uintptr_t rsdp_virt = g_boot_info->rsdp_addr;
     uintptr_t rsdp_phys = virt_to_phys((void*) rsdp_virt);
 
-    pmap_map(pmap_kernel(), rsdp_virt, rsdp_phys, sizeof(acpi_rsdp_t), PROT_READ | PROT_GLOBAL);
+    pmap_map(pmap_kernel(), rsdp_virt, rsdp_phys, sizeof(acpi_rsdp_t), PROT_READ);
 
     acpi_rsdp_t *rsdp = (acpi_rsdp_t *)rsdp_virt;
 
@@ -57,10 +57,10 @@ int acpi_init(void) {
     uintptr_t xsdt_phys = rsdp->xsdt_address;
     uintptr_t xsdt_virt = (uintptr_t)phys_to_virt(xsdt_phys);
 
-    pmap_map(pmap_kernel(), xsdt_virt, xsdt_phys, sizeof(acpi_sdt_header_t), PROT_READ | PROT_GLOBAL);
+    pmap_map(pmap_kernel(), xsdt_virt, xsdt_phys, sizeof(acpi_sdt_header_t), PROT_READ);
     
     acpi_sdt_header_t *xsdt_hdr = (acpi_sdt_header_t *)xsdt_virt;
-    pmap_map(pmap_kernel(), xsdt_virt, xsdt_phys, xsdt_hdr->length, PROT_READ | PROT_GLOBAL);
+    pmap_map(pmap_kernel(), xsdt_virt, xsdt_phys, xsdt_hdr->length, PROT_READ);
 
     if (!validate_checksum(xsdt_hdr)) return -1;
 

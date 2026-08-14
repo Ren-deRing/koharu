@@ -1,0 +1,15 @@
+#pragma once
+
+#define THREAD_ARCH_RSP_OFFSET    0x00
+#define THREAD_ARCH_FSBASE_OFFSET 0x08
+#define THREAD_ARCH_XSAVE_OFFSET  0x10
+#define THREAD_PMAP_OFFSET        0x18
+#define THREAD_KSTACK_OFFSET      0x78
+
+#define CPU_ARCH_TSS_OFFSET       0x00
+#define CPU_KSTACK_TOP_OFFSET     0x08
+#define CPU_ARCH_CPU_DATA_OFFSET  0x28
+
+#define TSS_RSP0_OFFSET           0x04
+
+#define PMAP_ROOT_PHYS_OFFSET     0x08

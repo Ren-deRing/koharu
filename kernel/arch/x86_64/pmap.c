@@ -84,6 +84,7 @@ pmap_t* pmap_create(void) {
     pml4e_t *pml4_virt = (pml4e_t*)phys_to_virt(pml4_phys);
 
     memset(pml4_virt, 0, PAGE_SIZE); // clean the page
+    memcpy(&pml4_virt[256], &((pml4e_t*)g_kernel_pmap.pm_root_virt)[256], 256 * sizeof(pml4e_t));
 
     pmap->pm_root_phys = pml4_phys;
     pmap->pm_root_virt = pml4_virt;

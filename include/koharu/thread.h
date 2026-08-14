@@ -8,6 +8,8 @@
 
 #include <stdint.h>
 
+#define THREAD_KSTACK_SIZE (1024 * 16)
+
 #define USER_STACK_TOP 0x7ffffffff000ULL
 #define USER_CODE_BASE 0x100000ULL
 
@@ -19,6 +21,10 @@ typedef enum thread_state {
 } thread_state_t;
 
 struct thread {
+    struct arch_thread arch;
+    pmap_t            *pmap;
+    struct trapframe  *tf;
+
     uint64_t           tid;
     uint64_t           pid;
     thread_state_t     state;
@@ -32,14 +38,12 @@ struct thread {
     list_node          sched_list;
     list_node          ipc_list;
 
-    pmap_t            *pmap;
-    struct trapframe  *tf;
-    struct arch_thread arch;
+    uint8_t            kernel_stack[THREAD_KSTACK_SIZE];
 };
+
+void switch_to(struct thread *prev, struct thread *next);
+void switch_to_first(struct thread *next);
+void user_trampoline();
 
 struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t affinity);
 void thread_exit(void);
-void sched_yield(void);
-void sched_tick(void);
-void sched_init(void);
-void sched_boot(void);

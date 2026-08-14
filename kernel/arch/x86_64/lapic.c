@@ -34,29 +34,28 @@ uint32_t x2apic_get_id(void) {
 
 void lapic_timer_stop(void) {
     wrmsr(IA32_X2APIC_LVT_TIMER, LAPIC_TIMER_MASKED);
-    wrmsr(IA32_X2APIC_TIMER_CUR, 0);
 }
 
 void lapic_timer_oneshot(uint8_t vector, uint64_t us) {
     lapic_timer_stop();
 
     wrmsr(IA32_X2APIC_TIMER_DIV, 0x0B);
-    wrmsr(IA32_X2APIC_LVT_TIMER, LAPIC_TIMER_ONESHOT | vector);
 
     uint64_t ticks = (curcpu->tsc_freq_hz / 1000000ULL) * us;
 
     wrmsr(IA32_X2APIC_TIMER_INIT, (uint32_t)ticks);
+    wrmsr(IA32_X2APIC_LVT_TIMER, LAPIC_TIMER_ONESHOT | vector);
 }
 
 void lapic_timer_periodic(uint8_t vector, uint32_t hz) {
     lapic_timer_stop();
 
     wrmsr(IA32_X2APIC_TIMER_DIV, 0x0B);
-    wrmsr(IA32_X2APIC_LVT_TIMER, LAPIC_TIMER_PERIODIC | vector);
 
     uint64_t ticks = curcpu->tsc_freq_hz / hz;
 
     wrmsr(IA32_X2APIC_TIMER_INIT, (uint32_t)ticks);
+    wrmsr(IA32_X2APIC_LVT_TIMER, LAPIC_TIMER_PERIODIC | vector);
 }
 
 int lapic_init(void) {

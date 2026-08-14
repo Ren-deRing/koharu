@@ -2,18 +2,20 @@ project('koharu', 'c', version: '0.1', meson_version: '>=1.4.0')
 
 subdir('boot')
 subdir('kernel')
+subdir('user')
 
 build_disk_script = find_program('python3')
 
 disk_img = custom_target('disk.img',
-  input: [bootloader_efi, kernel_elf],
+  input: [bootloader_efi, kernel_elf, init_elf],
   output: 'disk.img',
   console: true,
   command: [
     build_disk_script,
     meson.current_source_dir() / 'make_disk.py',
     meson.current_build_dir(),
-    meson.current_source_dir()
+    meson.current_source_dir(),
+    init_elf.full_path(),
   ]
 )
 

@@ -19,6 +19,8 @@ kernel_sources = files(
   'misc/kpanic.c',
   'misc/kprintf.c',
   'dev/acpi.c',
+  'task/init.c',
+  'task/sched.c',
   'arch/x86_64/cpu.c',
   'arch/x86_64/idt.c',
   'arch/x86_64/pmap.c',
@@ -28,6 +30,7 @@ kernel_sources = files(
   'arch/x86_64/irq.S',
   'arch/x86_64/lapic.c',
   'arch/x86_64/thread.c',
+  'arch/x86_64/switch.S',
   'lib/tlsf.c',
   'lib/string.c'
 )

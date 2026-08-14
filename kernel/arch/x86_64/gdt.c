@@ -1,6 +1,8 @@
 #include <koharu/cpu.h>
 #include <koharu/initcall.h>
 
+#include <asm/cpu.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -44,6 +46,7 @@ typedef struct {
     gdtr_t      pointer;
     tss_entry_t tss;
     uint8_t df_stack[8192] __attribute__((aligned(16)));
+    uint8_t kstack[16384] __attribute__((aligned(16))); 
 } __attribute__((packed)) GDT;
 
 GDT gdt[MAX_CPUS];
@@ -76,6 +79,8 @@ static inline void gdt_load(gdtr_t* ptr) {
 }
 
 int init_gdt() {
+    extern struct arch_cpu arch_cpus[];
+
     for (int i = 0; i < MAX_CPUS; i++) {
         set_gdt_entry(&gdt[i].entries[1], 0x9A, 0x20); // kernel code (0x08)
         set_gdt_entry(&gdt[i].entries[2], 0x92, 0x00); // kernel data (0x10)
@@ -99,6 +104,11 @@ int init_gdt() {
 
         // IST1 (for #DF)
         gdt[i].tss.ist[0] = (uintptr_t)gdt[i].df_stack + sizeof(gdt[i].df_stack);
+
+        // kstack
+        gdt[i].tss.rsp[0] = (uintptr_t)gdt[i].kstack + sizeof(gdt[i].kstack);
+
+        arch_cpus[i].tss = &gdt[i].tss;
 
         // LGDT
         gdt[i].pointer.limit = sizeof(gdt[i].entries) - 1;

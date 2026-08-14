@@ -1,5 +1,6 @@
 #include <koharu/initcall.h>
 #include <koharu/print.h>
+#include <koharu/cpu.h>
 
 #include <asm/trapframe.h>
 #include <idt.h>
@@ -21,7 +22,19 @@ typedef struct {
     uint64_t base;
 } __attribute__((packed)) idtr_t;
 
+struct isr_slot {
+    handler_t func;
+    void *data;
+};
+
+static volatile idt_entry_t idt[256];
+static volatile idtr_t idtr;
+static struct isr_slot handlers[256];
+
 void isr_handler(struct trapframe *tf) {
+    struct isr_slot *slot = &handlers[tf->vector];
+    if (slot->func) { slot->func(tf, slot->data); return; }
+
     dprintf("\nPANIC! [#%02lu] [E%lu]\n", tf->vector, tf->error);
     dprintf("  CS:RIP = 0x%04lx:0x%016lx\n", tf->cs, tf->rip);
     dprintf("  RAX:     0x%016lx  RBX: 0x%016lx\n", tf->rax, tf->rbx);
@@ -37,9 +50,6 @@ void isr_handler(struct trapframe *tf) {
     dprintf("that was not a panic.\n\n");
 }
 
-static volatile idt_entry_t idt[256];
-static volatile idtr_t idtr;
-
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags, uint8_t ist) {
     uintptr_t addr = (uintptr_t)isr;
     idt[vector].isr_low    = addr & 0xFFFF;
@@ -49,6 +59,11 @@ void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags, uint8_t ist) {
     idt[vector].isr_mid    = (addr >> 16) & 0xFFFF;
     idt[vector].isr_high   = (addr >> 32) & 0xFFFFFFFF;
     idt[vector].reserved   = 0;
+}
+
+void register_handler(uint8_t vector, handler_t handler, void *data) {
+    handlers[vector].func = handler;
+    handlers[vector].data = data;
 }
 
 int init_idt() {
@@ -84,6 +99,10 @@ int init_idt() {
 	idt_set_descriptor(29, isr29, 0x8E, 0);
 	idt_set_descriptor(30, isr30, 0x8E, 0);
 	idt_set_descriptor(31, isr31, 0x8E, 0);
+
+    for (int i = 0; i < (255 - 31); i++) {
+        idt_set_descriptor(i + 32, (void*)isr_stub_table[i], 0x8E, 0);
+    }
 
     return 0;
 }

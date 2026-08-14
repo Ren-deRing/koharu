@@ -6,12 +6,20 @@ import shutil
 
 build_dir = sys.argv[1]
 source_dir = sys.argv[2]
+init_elf_path = sys.argv[3]
 
 initrd_dir = os.path.join(source_dir, "initrd")
 os.makedirs(initrd_dir, exist_ok=True)
 
+initrd_stage = os.path.join(build_dir, "initrd_stage")
+if os.path.exists(initrd_stage):
+    shutil.rmtree(initrd_stage)
+shutil.copytree(os.path.join(source_dir, "initrd"), initrd_stage)
+
+shutil.copy(init_elf_path, os.path.join(initrd_stage, "init.elf"))
+
 initrd_cpio_path = os.path.join(build_dir, "initrd.cpio")
-subprocess.run(f"cd {source_dir}/initrd && find . -mindepth 1 -printf '%P\\n' | cpio -o -H newc > {initrd_cpio_path}", shell=True, check=True)
+subprocess.run(f"cd {initrd_stage} && find . -mindepth 1 -printf '%P\\n' | cpio -o -H newc > {initrd_cpio_path}", shell=True, check=True)
 
 bootbin_dir = os.path.join(build_dir, "bootbin_dir")
 if os.path.exists(bootbin_dir):

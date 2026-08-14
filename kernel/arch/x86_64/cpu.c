@@ -77,7 +77,8 @@ static inline uint32_t get_apic_id(void) {
 void init_cpu_gs(struct cpu* cpu_ptr) {
     uint64_t addr = (uint64_t)cpu_ptr;
     // IA32_GS_BASE MSR = 0xC0000101
-    asm volatile ("wrmsr" : : "c"(0xC0000101), "a"((uint32_t)addr), "d"((uint32_t)(addr >> 32)): "memory");
+    asm volatile ("wrmsr" : : "c"(0xC0000101), "a"((uint32_t)addr), "d"((uint32_t)(addr >> 32)): "memory"); // gs base
+    asm volatile ("wrmsr" : : "c"(0xC0000102), "a"((uint32_t)addr), "d"((uint32_t)(addr >> 32)): "memory"); // kernel gs base
 }
 
 struct cpu* get_this_core(void) {
@@ -123,6 +124,16 @@ int enable_pge(void) { // Page Global
     uintptr_t cr4;
     asm volatile("mov %%cr4, %0" : "=r"(cr4));
     cr4 |= (1ULL << 7); // PGE
+    asm volatile("mov %0, %%cr4" :: "r"(cr4));
+
+    return 0;
+}
+
+int enable_smepsmap(void) {
+    uintptr_t cr4;
+    asm volatile("mov %%cr4, %0" : "=r"(cr4));
+    cr4 |= (1ULL << 20); // SMEP
+    cr4 |= (1ULL << 21); // SMAP
     asm volatile("mov %0, %%cr4" :: "r"(cr4));
 
     return 0;
@@ -245,7 +256,8 @@ int set_tsc_frequency(void) {
 early_initcall(init_percpu, A2);
 early_initcall(enable_nx, A3);
 early_initcall(enable_pge, A4);
-early_initcall(enable_xsaves, A5);
-early_initcall(enable_fsgsbase, A6);
-early_initcall(enable_x2apic, A7);
-early_initcall(set_tsc_frequency, A8);
+early_initcall(enable_smepsmap, A5);
+early_initcall(enable_xsaves, A6);
+early_initcall(enable_fsgsbase, A7);
+early_initcall(enable_x2apic, A8);
+early_initcall(set_tsc_frequency, A9);

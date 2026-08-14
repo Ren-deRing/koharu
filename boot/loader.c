@@ -148,7 +148,7 @@ efi_status_t load_bootbin(boot_info_t *boot_info) {
 
     uint64_t init_base = 0;
     size_t init_size = 0;
-    status = cpio_extract((void *)initrd_base, "koharu.ppm", &init_base, &init_size); // for now.
+    status = cpio_extract((void *)initrd_base, "init.elf", &init_base, &init_size); // for now.
     if (EFI_ERROR(status)) {
         init_base = 0;
         init_size = 0;
