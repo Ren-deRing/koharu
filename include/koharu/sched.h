@@ -15,4 +15,5 @@ void sched_boot(void);
 void sched_enqueue(struct thread *t);
 
 void sched_block(void);
+void sched_exit(void);
 void sched_wakeup(struct thread *t);

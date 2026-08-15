@@ -1,8 +1,8 @@
 #include <stdint.h>
 
 #define SYS_EXIT 0
-#define SYS_CALL 5
-#define SYS_REPLY_RECV 6
+#define SYS_CALL 4
+#define SYS_REPLY_RECV 5
 #define SERVER_TID 0
 
 #define N_WARMUP 100

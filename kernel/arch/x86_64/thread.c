@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 
-struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t affinity) {
+struct thread *thread_create_child(pmap_t *pmap, uintptr_t entry) {
     struct thread *t = (struct thread*)kmalloc_aligned(sizeof(struct thread), 16);
     if (!t) return NULL;
 
@@ -24,22 +24,10 @@ struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t 
 
     t->pmap = pmap;
 
-    void* stack = pmm_alloc_pages(3); // 32KB
-    if (!stack) { kfree_aligned(t); return NULL; } 
-
-    int status = pmap_map(t->pmap, USER_STACK_TOP - (32 * 1024), (uintptr_t)stack,
-        32 * 1024, PROT_READ | PROT_WRITE | PROT_USER);
-
-    if (status != 0) {
-        pmm_free_pages(stack, 3);
-        kfree_aligned(t);
-        return NULL;
-    }
-
     t->tf = (struct trapframe *)((uintptr_t)t->kernel_stack + THREAD_KSTACK_SIZE - sizeof(struct trapframe));
 
     t->tf->rip    = entry;
-    t->tf->rdi    = (uintptr_t)arg;
+    t->tf->rdi    = 0;
     t->tf->rsp    = USER_STACK_TOP;
     t->tf->cs     = 0x23;
     t->tf->ss     = 0x1B;
@@ -47,7 +35,7 @@ struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t 
 
     t->tid               = thread_alloc_tid();
     t->pid               = 0;
-    t->cpu_affinity      = affinity;
+    t->cpu_affinity      = 0;
     t->total_cpu_time    = 0;
     t->time_quantum_left = 0;
 
@@ -70,13 +58,44 @@ struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t 
     *xcomp_bv = (1ULL << 63); // compacted format
 
     if (thread_register(t) != 0) {
-        pmm_free_pages(stack, 3);
-        kfree_aligned(t);
         kfree_aligned(t->arch.xsaves_area);
+        kfree_aligned(t);
         return NULL;
     }
+
+    return t;
+}
+
+struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t affinity) {
+    struct thread *t = thread_create_child(pmap, entry);
+    if (!t) return NULL;
+
+    void* stack = pmm_alloc_pages(3); // 32KB
+    if (!stack) {
+        kfree_aligned(t->arch.xsaves_area);
+        kfree_aligned(t);
+        return NULL;
+    }
+
+    int status = pmap_map(t->pmap, USER_STACK_TOP - (32 * 1024), (uintptr_t)stack,
+        32 * 1024, PROT_READ | PROT_WRITE | PROT_USER);
+
+    if (status != 0) {
+        pmm_free_pages(stack, 3);
+        kfree_aligned(t->arch.xsaves_area);
+        kfree_aligned(t);
+        return NULL;
+    }
+
+    t->tf->rdi       = (uintptr_t)arg;
+    t->cpu_affinity  = affinity;
 
     sched_enqueue(t);
 
     return t;
+}
+
+void thread_exit(void) {
+    sched_exit();
+    __builtin_unreachable();
 }

@@ -31,9 +31,6 @@ void generic_entry(boot_info_t* boot_info) {
     
     elf_load(up, (void *)g_boot_info->init.addr, g_boot_info->init.size, &entry);
     
-    pmap_map(up, 0x800000, virt_to_phys(boot_info->framebuffer.address),
-            (2 * 1024 * 1024), PROT_READ | PROT_WRITE | PROT_USER | PROT_WC);
-    
     struct thread *t[2];
     for (int i = 0; i < 2; i++)
         t[i] = thread_create(up, entry, (void *)(uintptr_t)i, 0);

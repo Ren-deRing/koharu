@@ -114,6 +114,22 @@ void sched_block(void) {
     switch_to(cur, next);
 }
 
+void sched_exit(void) {
+    struct thread *cur = curcpu->current;
+
+    cur->state = THREAD_TERMINATED;
+
+    struct thread *next = sched_pick();
+    if (!next) {
+        dprintf("sched: no runnable thread\n");
+        for (;;) arch_halt();
+    }
+
+    curcpu->current = next;
+    next->state = THREAD_RUNNING;
+    switch_to(cur, next);
+}
+
 void sched_enqueue(struct thread *t) {
     t->current_level     = 0;
     t->state             = THREAD_READY;
