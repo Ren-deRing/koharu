@@ -35,6 +35,7 @@ struct thread *thread_create_child(pmap_t *pmap, uintptr_t entry) {
 
     t->tid               = thread_alloc_tid();
     t->pid               = 0;
+    t->state             = THREAD_CREATED;
     t->cpu_affinity      = 0;
     t->total_cpu_time    = 0;
     t->time_quantum_left = 0;

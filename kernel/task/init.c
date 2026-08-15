@@ -1,7 +1,17 @@
+#include <koharu/cpu.h>
 #include <koharu/elf.h>
+#include <koharu/grant.h>
 #include <koharu/mmu.h>
 #include <koharu/pmap.h>
+#include <koharu/print.h>
+#include <koharu/root.h>
+#include <koharu/thread.h>
 #include <koharu/string.h>
+
+static void boot_fail(const char *msg) {
+    dprintf("rootserver_boot: %s failed\n", msg);
+    for (;;) arch_halt();
+}
 
 int elf_load(pmap_t *pmap, const void *elf, size_t size, uintptr_t *entry_out) {
     const Elf64_Ehdr *ehdr = (const Elf64_Ehdr *)elf;
@@ -59,3 +69,52 @@ int elf_load(pmap_t *pmap, const void *elf, size_t size, uintptr_t *entry_out) {
     return 0;
 }
 
+void rootserver_boot(void) {
+    pmap_t *pmap = pmap_create();
+    if (!pmap) boot_fail("pmap_create");
+
+    uintptr_t boot_pg = (uintptr_t)pmm_alloc_pages(0);
+    if (!boot_pg) boot_fail("boot page");
+
+    struct root_boot *boot = (struct root_boot *)phys_to_virt(boot_pg);
+    memset(boot, 0, sizeof(*boot));
+
+    uintptr_t entry;
+    if (elf_load(pmap, (const void *)g_boot_info->init.addr, g_boot_info->init.size, &entry) != 0)
+        boot_fail("elf_load");
+
+    grant_set_root(pmap);
+
+    uintptr_t fb_phys = 0;
+    if (g_boot_info->framebuffer.address) {
+        fb_phys = virt_to_phys((void *)g_boot_info->framebuffer.address);
+
+        size_t fb_bytes = (size_t)g_boot_info->framebuffer.height
+                        * g_boot_info->framebuffer.pitch * 4;
+        for (uintptr_t pa = fb_phys; pa < fb_phys + fb_bytes; pa += PAGE_SIZE) {
+            if (grant_add(pmap, phys_to_pfn(pa), GRANT_READ | GRANT_WRITE | GRANT_GRANT) != 0)
+                boot_fail("grant fb");
+        }
+    }
+
+    boot->fb.address = (uint32_t *)fb_phys;
+    boot->fb.width   = g_boot_info->framebuffer.width;
+    boot->fb.height  = g_boot_info->framebuffer.height;
+    boot->fb.pitch   = g_boot_info->framebuffer.pitch;
+
+    struct thread *t = thread_create(pmap, entry, (void *)ROOT_BOOT_VA, 0);
+    if (!t) boot_fail("thread_create");
+    boot->self_tid = t->tid;
+
+    grant_pool_build();
+    boot->pool_bytes  = grant_pool_bytes();
+    boot->frame_count = grant_frame_count();
+
+    if (pmap_map(pmap, ROOT_BOOT_VA, boot_pg, PAGE_SIZE, PROT_READ | PROT_USER) != 0)
+        boot_fail("map boot");
+    if (pmap_map(pmap, ROOT_POOL_VA, grant_pool_phys(), grant_pool_bytes(), PROT_READ | PROT_USER) != 0)
+        boot_fail("map pool");
+
+    dprintf("rootserver: tid=%lu entry=%p fb=%p\n",
+            t->tid, (void *)entry, (void *)fb_phys);
+}

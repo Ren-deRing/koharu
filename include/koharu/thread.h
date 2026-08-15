@@ -15,6 +15,7 @@
 #define USER_CODE_BASE 0x100000ULL
 
 typedef enum thread_state {
+    THREAD_CREATED,     // created, but started yet
     THREAD_READY,       // ready (in RunQueue)
     THREAD_RUNNING,     // running
     THREAD_BLOCKED,     // IPC waiting
