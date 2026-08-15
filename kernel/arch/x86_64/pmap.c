@@ -88,6 +88,8 @@ pmap_t* pmap_create(void) {
 
     pmap->pm_root_phys = pml4_phys;
     pmap->pm_root_virt = pml4_virt;
+    
+    list_init((struct list_head *)&pmap->grant_list);
 
     return pmap;
 }

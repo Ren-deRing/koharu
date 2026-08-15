@@ -38,6 +38,7 @@ struct thread *thread_create_child(pmap_t *pmap, uintptr_t entry) {
     t->cpu_affinity      = 0;
     t->total_cpu_time    = 0;
     t->time_quantum_left = 0;
+    t->pager_tid         = 0;
 
     uint64_t *sp = (uint64_t *)t->tf;
 
