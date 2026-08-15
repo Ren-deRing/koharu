@@ -69,6 +69,59 @@ void kfree(void *ptr) {
     arch_irq_restore(flags);
 }
 
+void* krealloc(void *ptr, size_t size) {
+    if (!ptr) return kmalloc(size);
+    if (size == 0) { kfree(ptr); return NULL; }
+
+    cpu_status_t flags = arch_irq_save();
+
+    page_t *page = virt_to_page(ptr);
+    struct cpu *owner = id_to_cpu(page->owner_cpu_id);
+
+    if (curcpu != owner) {
+        // not my heap
+        size_t old_size = tlsf_block_size(ptr) - tlsf_alloc_overhead();
+        arch_irq_restore(flags);
+
+        void *new_ptr = kmalloc(size);
+        if (!new_ptr) return NULL;
+
+        memcpy(new_ptr, ptr, size < old_size ? size : old_size);
+        kfree(ptr);
+        return new_ptr;
+    }
+
+    // fast path
+    void *new_ptr = tlsf_realloc(curcpu->tlsf_ctrl, ptr, size);
+    if (new_ptr) { arch_irq_restore(flags); return new_ptr; }
+
+    // slow path
+    tlsf_flush_pending(curcpu);
+    new_ptr = tlsf_realloc(curcpu->tlsf_ctrl, ptr, size);
+    if (new_ptr) { arch_irq_restore(flags); return new_ptr; }
+
+    size_t alloc_bytes = size + 64;
+    size_t pages = (alloc_bytes + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    size_t req_order = (pages <= 1) ? 0 : 32 - __builtin_clz((uint32_t)(pages - 1));
+    size_t order = (req_order < 4) ? 4 : req_order;
+
+    void *phys_ptr = pmm_alloc_pages(order);
+    if (!phys_ptr && (uintptr_t)phys_ptr == 0) { arch_irq_restore(flags); return NULL; }
+
+    size_t page_count = 1ULL << order;
+    size_t base_pfn = phys_to_pfn((uintptr_t)phys_ptr);
+    for (size_t i = 0; i < page_count; i++) {
+        page_t *pg = pfn_to_page(base_pfn + i);
+        pg->owner_cpu_id = curcpu->id;
+    }
+
+    void *pool_ptr = phys_to_virt((uintptr_t)phys_ptr);
+    tlsf_add_pool(curcpu->tlsf_ctrl, pool_ptr, page_count << PAGE_SHIFT);
+
+    arch_irq_restore(flags);
+    return tlsf_realloc(curcpu->tlsf_ctrl, ptr, size);
+}
+
 void* kmalloc_aligned(size_t size, size_t alignment) {
     if (alignment == 0) return NULL;
 

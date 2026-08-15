@@ -2,9 +2,10 @@ ENTRY(_start)
 
 PHDRS
 {
-    text   PT_LOAD;
+    text   PT_LOAD FILEHDR PHDRS;
     rodata PT_LOAD;
     data   PT_LOAD;
+    tls    PT_TLS;
 }
 
 SECTIONS
@@ -12,7 +13,7 @@ SECTIONS
     . = 0x100000;
 
     . = . + SIZEOF_HEADERS;
-    . = ALIGN(CONSTANT(MAXPAGESIZE)); 
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .text : {
         KEEP(*(entry))
@@ -35,6 +36,16 @@ SECTIONS
         *(.bss .bss.*)
         *(COMMON)
     } :data
+
+    . = ALIGN(64);
+
+    .tdata : {
+        *(.tdata .tdata.*)
+    } :tls :data
+
+    .tbss : {
+        *(.tbss .tbss.*)
+    } :tls :data
 
     /DISCARD/ : {
         *(.eh_frame*)

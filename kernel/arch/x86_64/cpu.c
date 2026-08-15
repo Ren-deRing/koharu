@@ -1,6 +1,7 @@
 #include <koharu/cpu.h>
 #include <koharu/initcall.h>
 #include <koharu/mmu.h>
+#include <koharu/syscall.h>
 
 #include <asm/cpu.h>
 
@@ -38,9 +39,14 @@ void arch_pause() {
     asm volatile ("pause");
 }
 
-extern uint64_t do_syscall(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4);
 void syscall_dispatch(struct trapframe *regs) {
-    regs->rax = do_syscall(regs->rax, regs->rdi, regs->rsi, regs->rdx, regs->r10);
+    struct syscall_ret ret;
+    uint64_t num = regs->rax;
+    regs->rax = do_syscall(num, regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8, regs->r9, &ret);
+    if (num == SYS_RECV || num == SYS_CALL || num == SYS_REPLY_RECV) {
+        regs->rdi = ret.extra[0]; regs->rsi = ret.extra[1]; regs->rdx = ret.extra[2];
+        regs->r10 = ret.extra[3]; regs->r8  = ret.extra[4];
+    }
 }
 
 uint64_t rdmsr(uint32_t msr) {

@@ -12,8 +12,6 @@
 #include <stdint.h>
 #include <string.h>
 
-uint32_t g_next_tid = 0;
-
 struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t affinity) {
     struct thread *t = (struct thread*)kmalloc_aligned(sizeof(struct thread), 16);
     if (!t) return NULL;
@@ -22,6 +20,7 @@ struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t 
 
     list_init((struct list_head *)&t->sched_list);
     list_init((struct list_head *)&t->ipc_list);
+    list_init((struct list_head *)&t->ipc_ep.ipc_waitqueue);
 
     t->pmap = pmap;
 
@@ -46,7 +45,7 @@ struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t 
     t->tf->ss     = 0x1B;
     t->tf->rflags = 0x202;
 
-    t->tid               = __atomic_fetch_add(&g_next_tid, 1, 5);
+    t->tid               = thread_alloc_tid();
     t->pid               = 0;
     t->cpu_affinity      = affinity;
     t->total_cpu_time    = 0;
@@ -69,6 +68,13 @@ struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t 
 
     uint64_t *xcomp_bv = (uint64_t *)((uint8_t *)t->arch.xsaves_area + 520); // 512 + 8
     *xcomp_bv = (1ULL << 63); // compacted format
+
+    if (thread_register(t) != 0) {
+        pmm_free_pages(stack, 3);
+        kfree_aligned(t);
+        kfree_aligned(t->arch.xsaves_area);
+        return NULL;
+    }
 
     sched_enqueue(t);
 

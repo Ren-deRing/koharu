@@ -1,0 +1,9 @@
+{
+	"folders": [
+		{ "path": "." },
+		{ "path": "mlibc" }
+	],
+	"settings": {
+		"terminal.integrated.cwd": "/home/heebb/koharu"
+	}
+}

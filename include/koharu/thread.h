@@ -43,6 +43,9 @@ struct thread {
 
     struct ipc_endpoint ipc_ep;
     uint32_t            home_cpu;
+
+    uint64_t            ipc_msg[IPC_MSG_WORDS]; // pending send / received msg
+    uint64_t            ipc_sender;             // sender tid of received msg
 };
 
 void switch_to(struct thread *prev, struct thread *next);
@@ -51,3 +54,7 @@ void user_trampoline();
 
 struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t affinity);
 void thread_exit(void);
+
+struct thread *thread_lookup(uint64_t tid);
+uint32_t thread_alloc_tid(void);
+int thread_register(struct thread *t);

@@ -22,6 +22,8 @@ kernel_sources = files(
   'task/init.c',
   'task/sched.c',
   'task/syscall.c',
+  'task/thread.c',
+  'task/ipc.c',
   'arch/x86_64/cpu.c',
   'arch/x86_64/idt.c',
   'arch/x86_64/pmap.c',

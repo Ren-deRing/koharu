@@ -260,6 +260,38 @@ void pmap_unmap(pmap_t *pmap, uintptr_t virt, size_t size) {
     }
 }
 
+uintptr_t pmap_extract(pmap_t *pmap, uintptr_t va) {
+    if (!pmap) return 0;
+
+    pml4e_t *pml4 = (pml4e_t *)pmap->pm_root_virt;
+
+    // PML4 -> PDPT
+    size_t l4 = PML4_INDEX(va);
+    if (!(pml4[l4] & PTE_PRESENT)) return 0;
+    pdpte_t *pdpt = (pdpte_t *)phys_to_virt(pml4[l4] & PTE_ADDR_MASK);
+
+    // PDPT -> PD
+    size_t l3 = PDPT_INDEX(va);
+    if (!(pdpt[l3] & PTE_PRESENT)) return 0;
+    pde_t *pd = (pde_t *)phys_to_virt(pdpt[l3] & PTE_ADDR_MASK);
+
+    // HUGE page
+    size_t l2 = PD_INDEX(va);
+    if (!(pd[l2] & PTE_PRESENT)) return 0;
+
+    if (pd[l2] & PDE_HUGE) {
+        return (pd[l2] & 0x000FFFFFFFE00000ULL) + (va & 0x1FFFFF);
+    }
+
+    // normal page
+    pte_t *pt = (pte_t *)phys_to_virt(pd[l2] & PTE_ADDR_MASK);
+
+    size_t l1 = PT_INDEX(va);
+    if (!(pt[l1] & PTE_PRESENT)) return 0;
+
+    return (pt[l1] & PTE_ADDR_MASK) + (va & 0xFFF);
+}
+
 void pmap_destroy(pmap_t *pmap) {
     if (!pmap || pmap == pmap_kernel()) return;
 

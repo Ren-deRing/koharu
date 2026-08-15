@@ -98,11 +98,31 @@ void sched_yield(void) {
     arch_irq_restore(flags);
 }
 
+void sched_block(void) {
+    struct thread *cur = curcpu->current;
+
+    cur->state = THREAD_BLOCKED;
+
+    struct thread *next = sched_pick();
+    if (!next) {
+        dprintf("sched: no runnable thread\n");
+        for (;;) arch_halt();
+    }
+
+    curcpu->current = next;
+    next->state = THREAD_RUNNING;
+    switch_to(cur, next);
+}
+
 void sched_enqueue(struct thread *t) {
     t->current_level     = 0;
     t->state             = THREAD_READY;
     t->time_quantum_left = QUANTUM_TICKS[0];
     list_add_tail(&t->sched_list, &curcpu->runq[0]);
+}
+
+void sched_wakeup(struct thread *t) {
+    sched_enqueue(t); // anyway, it's a same thing
 }
 
 void sched_boot(void) {
