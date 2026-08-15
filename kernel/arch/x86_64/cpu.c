@@ -34,6 +34,15 @@ void arch_halt() {
     asm volatile ("hlt");
 }
 
+void arch_pause() {
+    asm volatile ("pause");
+}
+
+extern uint64_t do_syscall(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4);
+void syscall_dispatch(struct trapframe *regs) {
+    regs->rax = do_syscall(regs->rax, regs->rdi, regs->rsi, regs->rdx, regs->r10);
+}
+
 uint64_t rdmsr(uint32_t msr) {
     uint32_t low, high;
     __asm__ __volatile__(
@@ -121,6 +130,11 @@ int enable_nx(void) { // Non-Executable
 }
 
 int enable_pge(void) { // Page Global
+    uint32_t eax, ebx, ecx, edx;
+    asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
+
+    if (!(edx & (1U << 13))) return -1;
+
     uintptr_t cr4;
     asm volatile("mov %%cr4, %0" : "=r"(cr4));
     cr4 |= (1ULL << 7); // PGE
@@ -130,6 +144,11 @@ int enable_pge(void) { // Page Global
 }
 
 int enable_smepsmap(void) {
+    uint32_t eax, ebx, ecx, edx;
+    asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(7), "c"(0));
+
+    if (!(ebx & (1U << 7)) || !(ebx & (1U << 20))) return -1;
+
     uintptr_t cr4;
     asm volatile("mov %%cr4, %0" : "=r"(cr4));
     cr4 |= (1ULL << 20); // SMEP
@@ -199,6 +218,19 @@ int enable_x2apic(void) {
     return 0;
 }
 
+extern void syscall_entry(void);
+int enable_syscalls(void) {
+    wrmsr(0xC0000081, 0x0013000800000000); // IA32_STAR ((0x13 << 48) | (0x08 << 32))
+    wrmsr(0xC0000082, (uint64_t)syscall_entry); // IA32_LSTAR
+    wrmsr(0xC0000084, 0x40700); // IA32_SFMASKd
+    
+    uint64_t efer = rdmsr(0xC0000080); // IA32_EFER
+    efer |= (1ULL << 0); // SCE
+    wrmsr(0xC0000080, efer);
+
+    return 0;
+}
+
 int set_tsc_frequency(void) {
     uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
 
@@ -253,11 +285,12 @@ int set_tsc_frequency(void) {
     return -1; // what is this?
 }
 
-early_initcall(init_percpu, A2);
-early_initcall(enable_nx, A3);
-early_initcall(enable_pge, A4);
-early_initcall(enable_smepsmap, A5);
-early_initcall(enable_xsaves, A6);
-early_initcall(enable_fsgsbase, A7);
-early_initcall(enable_x2apic, A8);
-early_initcall(set_tsc_frequency, A9);
+early_initcall(init_percpu, A02);
+early_initcall(enable_nx, A03);
+early_initcall(enable_pge, A04);
+early_initcall(enable_smepsmap, A05);
+early_initcall(enable_xsaves, A06);
+early_initcall(enable_fsgsbase, A07);
+early_initcall(enable_x2apic, A08);
+early_initcall(enable_syscalls, A09);
+early_initcall(set_tsc_frequency, A10);

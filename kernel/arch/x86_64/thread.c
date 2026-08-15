@@ -68,7 +68,7 @@ struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t 
     memset(t->arch.xsaves_area, 0, curcpu->arch_cpu_data->xsave_size);
 
     uint64_t *xcomp_bv = (uint64_t *)((uint8_t *)t->arch.xsaves_area + 520); // 512 + 8
-    *xcomp_bv = (1ULL << 63);
+    *xcomp_bv = (1ULL << 63); // compacted format
 
     sched_enqueue(t);
 

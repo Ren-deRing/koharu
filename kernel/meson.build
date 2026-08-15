@@ -21,6 +21,7 @@ kernel_sources = files(
   'dev/acpi.c',
   'task/init.c',
   'task/sched.c',
+  'task/syscall.c',
   'arch/x86_64/cpu.c',
   'arch/x86_64/idt.c',
   'arch/x86_64/pmap.c',
@@ -31,6 +32,7 @@ kernel_sources = files(
   'arch/x86_64/lapic.c',
   'arch/x86_64/thread.c',
   'arch/x86_64/switch.S',
+  'arch/x86_64/syscall.S',
   'lib/tlsf.c',
   'lib/string.c'
 )

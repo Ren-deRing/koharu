@@ -29,11 +29,12 @@ typedef struct {
 typedef struct tss_entry {
 	uint32_t koharu;
 	uint64_t rsp[3];
-	uint64_t is;
+	uint32_t is;
 	uint64_t ist[7];
-	uint64_t good;
-	uint16_t isntit;
-	uint16_t iomap_offset;
+	uint32_t good;
+	uint32_t isntit;
+	uint16_t iomap_base;
+    uint16_t reserved;
 } __attribute__ ((packed)) tss_entry_t;
 
 typedef struct {

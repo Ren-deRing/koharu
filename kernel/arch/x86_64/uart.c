@@ -36,5 +36,5 @@ int early_log_init() {
     return 0;
 }
 
-early_initcall(uart_init, A0);
-early_initcall(early_log_init, A1);
+early_initcall(uart_init, A00);
+early_initcall(early_log_init, A01);

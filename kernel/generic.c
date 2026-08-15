@@ -30,8 +30,6 @@ void generic_entry(boot_info_t* boot_info) {
     uintptr_t entry;
     
     elf_load(up, (void *)g_boot_info->init.addr, g_boot_info->init.size, &entry);
-
-    dprintf("elf entry: 0x%lx\n", entry);
     
     pmap_map(up, 0x800000, virt_to_phys(boot_info->framebuffer.address),
             (2 * 1024 * 1024), PROT_READ | PROT_WRITE | PROT_USER | PROT_WC);

@@ -8,6 +8,7 @@
 
 #define CPU_ARCH_TSS_OFFSET       0x00
 #define CPU_KSTACK_TOP_OFFSET     0x08
+#define CPU_USER_SP_OFFSET        0x10
 #define CPU_ARCH_CPU_DATA_OFFSET  0x28
 
 #define TSS_RSP0_OFFSET           0x04

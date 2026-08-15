@@ -37,6 +37,8 @@ struct cpu* id_to_cpu(uint16_t cpu_id);
 void register_handler(uint8_t vector, handler_t handler, void *data);
 
 void arch_halt();
+void arch_pause();
+
 cpu_status_t arch_irq_save(void);
 void arch_irq_restore(cpu_status_t flags);
 void arch_irq_disable(void);
