@@ -1,6 +1,8 @@
 #pragma once
 
 #include <koharu/list.h>
+#include <koharu/lock.h>
+
 #include <stdint.h>
 
 #define IPC_MSG_WORDS 5
@@ -14,6 +16,7 @@ typedef enum ipc_endpoint_state {
 } ipc_endpoint_state_t;
 
 struct ipc_endpoint {
+    spinlock_t           lock;
     ipc_endpoint_state_t state;
 
     list_node            ipc_waitqueue;

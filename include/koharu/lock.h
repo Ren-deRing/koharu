@@ -1,8 +1,7 @@
 #pragma once
 
-#include <koharu/cpu.h>
-
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
     volatile uint32_t now_serving;
@@ -18,3 +17,8 @@ bool spin_trylock(spinlock_t *lock);
 void spin_unlock(spinlock_t *lock);
 uint64_t spin_lock_irqsave(spinlock_t *lock);
 void spin_unlock_irqrestore(spinlock_t *lock, uint64_t flags);
+
+// ahh, i hate circular reference
+void arch_pause(void);
+uint64_t arch_irq_save(void);
+void arch_irq_restore(uint64_t flags);

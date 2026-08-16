@@ -1,5 +1,4 @@
 #include <koharu/lock.h>
-#include <koharu/cpu.h>
 
 void spin_lock_init(spinlock_t *lock) {
     lock->now_serving = 0;
@@ -15,7 +14,6 @@ void spin_lock(spinlock_t *lock) {
     }
 
     __sync_synchronize();
-    lock->holder_cpu = curcpu->id;
 }
 
 bool spin_trylock(spinlock_t *lock) {
@@ -25,14 +23,12 @@ bool spin_trylock(spinlock_t *lock) {
     }
     if (__sync_bool_compare_and_swap(&lock->next_ticket, serving, serving + 1)) {
         __sync_synchronize();
-        lock->holder_cpu = curcpu->id;
         return true;
     }
     return false;
 }
 
 void spin_unlock(spinlock_t *lock) {
-    lock->holder_cpu = -1;
     __sync_synchronize();
 
     lock->now_serving++;

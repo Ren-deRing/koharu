@@ -20,7 +20,9 @@ struct thread *thread_create_child(pmap_t *pmap, uintptr_t entry) {
 
     list_init((struct list_head *)&t->sched_list);
     list_init((struct list_head *)&t->ipc_list);
+    list_init((struct list_head *)&t->ipc_wait_list);
     list_init((struct list_head *)&t->ipc_ep.ipc_waitqueue);
+    spin_lock_init(&t->ipc_ep.lock);
 
     t->pmap = pmap;
 
