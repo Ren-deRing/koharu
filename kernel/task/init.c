@@ -112,9 +112,21 @@ void rootserver_boot(void) {
 
     if (pmap_map(pmap, ROOT_BOOT_VA, boot_pg, PAGE_SIZE, PROT_READ | PROT_USER) != 0)
         boot_fail("map boot");
-    if (pmap_map(pmap, ROOT_POOL_VA, grant_pool_phys(), grant_pool_bytes(), PROT_READ | PROT_USER) != 0)
+    if (pmap_map(pmap, ROOT_POOL_VA, grant_pool_phys(), grant_pool_bytes(),
+                 PROT_READ | PROT_WRITE | PROT_USER) != 0)
         boot_fail("map pool");
 
-    dprintf("rootserver: tid=%lu entry=%p fb=%p\n",
-            t->tid, (void *)entry, (void *)fb_phys);
+    size_t initrd_size = g_boot_info->initrd.size;
+    if (initrd_size == 0) {
+        boot->initrd.addr = 0;
+        boot->initrd.size = 0;
+    } else {
+        uintptr_t initrd_phys = virt_to_phys((void *)g_boot_info->initrd.addr);
+        if (pmap_map(pmap, ROOT_INITRD_VA, initrd_phys,
+                     ALIGN_UP(initrd_size, PAGE_SIZE), PROT_READ | PROT_USER) != 0)
+            boot_fail("map initrd");
+
+        boot->initrd.addr = ROOT_INITRD_VA + (initrd_phys & (PAGE_SIZE - 1));
+        boot->initrd.size = initrd_size;
+    }
 }

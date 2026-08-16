@@ -39,6 +39,8 @@ struct thread {
 
     list_node           sched_list;
     list_node           ipc_list;
+    list_node           ipc_wait_list;
+    list_node           futex_list;
 
     uint8_t             kernel_stack[THREAD_KSTACK_SIZE];
 

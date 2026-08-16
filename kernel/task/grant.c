@@ -38,7 +38,7 @@ int grant_pool_build(void) {
     g_pool_v = (uint8_t *)phys_to_virt((uintptr_t)mem);
 
     for (uint64_t pfn = 0; pfn < g_frames; pfn++) {
-        if (pfn_to_page(pfn)->is_free)
+        if (pmm_frame_in_pool(pfn))
             g_pool_v[pfn / 8] |= (uint8_t)(1 << (pfn % 8));
     }
 
