@@ -1,5 +1,7 @@
+#include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
+#include <sys/mman.h>
 #include <pthread.h>
 #include <bits/syscall.h>
 
@@ -16,10 +18,22 @@ int main(int argc, char *argv[], char *envp[]) {
 
     syscall(SYS_SEND, __koharu_pager_tid, KOHARU_REQ_READY, 0, 0, 0);
 
-    // The pager holds this shared mutex until it is ready to serve our next
-    // heap request. Blocking on it goes through mlibc -> SYS_FUTEX_WAIT.
     pthread_mutex_lock(mutex);
     pthread_mutex_unlock(mutex);
+
+    void *mapped = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mapped == MAP_FAILED) {
+        printf("mmap failed\n");
+    } else {
+        volatile char *p = (volatile char *)mapped;
+        p[0] = 0x41;
+        printf("mmap -> %p, byte=%d\n", mapped, (int)p[0]);
+    }
+
+    char *buf1 = (char*)malloc(64);
+    strcpy(buf1, "shimoe koharu");
+    printf("buffer says: '%s'\n", buf1);
 
     printf("Hello, mlibc!\n");
 

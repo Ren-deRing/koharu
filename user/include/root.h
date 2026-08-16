@@ -16,6 +16,7 @@
 
 #define KOHARU_REQ_ALLOC 1
 #define KOHARU_REQ_READY 2
+#define KOHARU_REQ_MAP   3
 
 #define CHILD_STACK_SIZE (128 * 1024)
 #define CHILD_STACK_TOP  0x7ffffffff000ULL

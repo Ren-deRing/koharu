@@ -40,6 +40,7 @@ child_args = [
 child_elf = executable('child',
   'child.c',
   c_args: child_args,
+  link_depends: mlibc_stamp,
   link_args: [
     '-fuse-ld=lld', '-nostdlib', '-no-pie', '-Wl,-m,elf_x86_64',
     '-Wl,-T,' + meson.current_source_dir() / 'child.ld',

@@ -1,5 +1,30 @@
 project('koharu', 'c', version: '0.1', meson_version: '>=1.4.0')
 
+python3 = find_program('python3')
+
+mlibc_sources = run_command(
+    python3, meson.current_source_dir() / 'scripts/list_mlibc_files.py',
+    meson.current_source_dir(),
+    meson.current_source_dir() / 'mlibc' / 'options',
+    meson.current_source_dir() / 'mlibc' / 'abis',
+    meson.current_source_dir() / 'mlibc' / 'sysdeps' / 'koharu',
+    meson.current_source_dir() / 'mlibc' / 'subprojects',
+    meson.current_source_dir() / 'mlibc' / 'meson.build',
+    meson.current_source_dir() / 'mlibc' / 'meson_options.txt',
+    meson.current_source_dir() / 'mlibc' / 'internal-config.h.in',
+    meson.current_source_dir() / 'mlibc' / 'mlibc-config.h.in',
+    check: true,
+).stdout().split()
+mlibc_sources += [meson.current_source_dir() / 'cross_x86_64.ini']
+
+mlibc_stamp = custom_target('mlibc-sysroot',
+  input: mlibc_sources,
+  output: 'mlibc-sysroot.stamp',
+  build_by_default: true,
+  console: true,
+  command: ['bash', meson.current_source_dir() / 'scripts/build_mlibc.sh', '@OUTPUT@'],
+)
+
 subdir('boot')
 subdir('kernel')
 subdir('user')

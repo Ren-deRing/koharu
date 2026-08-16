@@ -129,7 +129,7 @@ void serve(uint64_t child) {
 
         if (msg[0] == KOHARU_REQ_READY) return;
 
-        if (msg[0] == KOHARU_REQ_ALLOC) {
+        if (msg[0] == KOHARU_REQ_ALLOC || msg[0] == KOHARU_REQ_MAP) {
             uint64_t pages = (msg[1] + PAGE_SIZE - 1) >> 12;
             int ok = 1;
 
