@@ -7,6 +7,7 @@ CompileFlags:
     - "-Ikernel/arch/x86_64/include"
     - "-I../include"
     - "-I../kernel/arch/x86_64/include"
+    - "-I../user/include"
 
 Style:
   AngledHeaders:

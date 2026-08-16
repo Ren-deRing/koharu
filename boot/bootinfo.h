@@ -47,11 +47,16 @@ typedef struct {
 } __attribute__((packed)) init_info_t;
 
 typedef struct {
+    uint64_t addr;
+    size_t size;
+} __attribute__((packed)) initrd_info_t;
+
+typedef struct {
     framebuffer_t framebuffer;
     mmap_info_t memory;
 
     kernel_info_t kernel;
     init_info_t init;
-    uint64_t initrd_addr;
+    initrd_info_t initrd;
     uint64_t rsdp_addr;
 } __attribute__((packed)) boot_info_t;

@@ -158,7 +158,8 @@ efi_status_t load_bootbin(boot_info_t *boot_info) {
     boot_info->kernel.kernel_size = kernel_size;
     boot_info->init.addr          = init_base;
     boot_info->init.size          = init_size;
-    boot_info->initrd_addr        = initrd_base;
+    boot_info->initrd.addr        = initrd_base;
+    boot_info->initrd.size        = initrd_size;
 
     return EFI_SUCCESS;
 }
