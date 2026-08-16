@@ -19,10 +19,36 @@
  *   - ipc_wait_list : a caller's own reply slot, so a later reply can find
  *                     and wake it even when the caller also sits on the
  *                     target's sender queue.
+ *
+ * Replies are matched per call. Every ipc_call takes a monotonically increasing seq on the caller,
+ * the receiver records it as ipc_prev_seq.
+ * ipc_reply_recv only delivers a reply when the caller is blocked on exactly that seq,
+ * so a stale reply can never be delivered to a newer call.
+ * Reply delivery never touches the receiver's ipc_prev_seq,
+ * and ipc_call saves/restores the caller's ipc_sender,
+ * so a server can make nested calls to other servers without losing reply context.
  */
 
-static void ipc_deliver(struct thread *recv, uint64_t sender_tid, const uint64_t *words) {
+static void ipc_deliver_msg(struct thread *recv, uint64_t sender_tid, const uint64_t *words,
+                            uint64_t prev_seq) {
     // recv->ipc_ep.lock must be held
+    struct ipc_endpoint *ep = &recv->ipc_ep;
+
+    list_del(ep->ipc_waitqueue.next);
+
+    memcpy(recv->ipc_msg, words, sizeof(uint64_t) * IPC_MSG_WORDS);
+    recv->ipc_sender = sender_tid;
+    recv->ipc_prev_seq = prev_seq;
+
+    if (list_empty((list_head *)&ep->ipc_waitqueue))
+        ep->state = IPC_EP_INACTIVE;
+
+    if (recv->state == THREAD_BLOCKED)
+        sched_wakeup(recv);
+}
+
+static void ipc_deliver_reply(struct thread *recv, uint64_t sender_tid, const uint64_t *words) {
+    // recv->ipc_ep.lock must be held; unlike a new message this must not touch recv->ipc_prev_seq
     struct ipc_endpoint *ep = &recv->ipc_ep;
 
     list_del(ep->ipc_waitqueue.next);
@@ -47,6 +73,7 @@ static uint64_t ipc_accept(struct thread *recv, uint64_t out[IPC_MSG_WORDS]) {
     list_del(&snd->ipc_list);
     memcpy(recv->ipc_msg, snd->ipc_msg, sizeof(uint64_t) * IPC_MSG_WORDS);
     recv->ipc_sender = sender_tid;
+    recv->ipc_prev_seq = (snd->ipc_ep.state == IPC_EP_WAIT_RECV) ? snd->ipc_call_seq : 0;
 
     if (list_empty((list_head *)&ep->ipc_waitqueue))
         ep->state = IPC_EP_INACTIVE;
@@ -71,7 +98,7 @@ int ipc_send(struct thread *target, const uint64_t words[IPC_MSG_WORDS]) {
 
     if (ep->state == IPC_EP_WAIT_RECV) {
         // target is waiting on its own queue, deliver straight to it
-        ipc_deliver(target, cur->tid, words);
+        ipc_deliver_msg(target, cur->tid, words, 0);
         spin_unlock(&ep->lock);
         arch_irq_restore(flags);
         return 0;
@@ -126,8 +153,14 @@ uint64_t ipc_call(struct thread *target, const uint64_t in[IPC_MSG_WORDS], uint6
 
     cpu_status_t flags = arch_irq_save();
 
-    // reserve a reply slot on our own endpoint
+    cur->ipc_call_seq++;
+    uint64_t seq = cur->ipc_call_seq;
+
+    // a server that makes a nested call
+    uint64_t saved_sender;
     spin_lock(&myep->lock);
+    saved_sender = cur->ipc_sender;
+    // reserve a reply slot on our own endpoint
     myep->state = IPC_EP_WAIT_RECV;
     list_add_tail(&cur->ipc_wait_list, (list_head *)&myep->ipc_waitqueue);
     spin_unlock(&myep->lock);
@@ -135,7 +168,7 @@ uint64_t ipc_call(struct thread *target, const uint64_t in[IPC_MSG_WORDS], uint6
     // hand the message over to the target
     spin_lock(&tep->lock);
     if (tep->state == IPC_EP_WAIT_RECV) {
-        ipc_deliver(target, cur->tid, in);
+        ipc_deliver_msg(target, cur->tid, in, seq);
     } else {
         memcpy(cur->ipc_msg, in, sizeof(uint64_t) * IPC_MSG_WORDS);
         tep->state = IPC_EP_WAIT_SEND;
@@ -148,6 +181,7 @@ uint64_t ipc_call(struct thread *target, const uint64_t in[IPC_MSG_WORDS], uint6
     spin_lock(&myep->lock);
     memcpy(out, cur->ipc_msg, sizeof(uint64_t) * IPC_MSG_WORDS);
     uint64_t sender = cur->ipc_sender;
+    cur->ipc_sender = saved_sender;
     spin_unlock(&myep->lock);
 
     arch_irq_restore(flags);
@@ -167,11 +201,12 @@ uint64_t ipc_reply_recv(const uint64_t reply[IPC_MSG_WORDS], uint64_t out[IPC_MS
     spin_unlock(&ep->lock);
 
     struct thread *caller = thread_lookup(prev_sender);
-    if (caller && caller != cur) {
+    if (cur->ipc_prev_seq != 0 && caller && caller != cur &&
+        caller->ipc_call_seq == cur->ipc_prev_seq) {
         spin_lock(&caller->ipc_ep.lock);
         if (caller->ipc_ep.state == IPC_EP_WAIT_RECV &&
             !list_empty((list_head *)&caller->ipc_ep.ipc_waitqueue)) {
-            ipc_deliver(caller, cur->tid, reply);
+            ipc_deliver_reply(caller, cur->tid, reply);
         }
         spin_unlock(&caller->ipc_ep.lock);
     }

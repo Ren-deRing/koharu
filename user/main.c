@@ -1,93 +1,129 @@
+#include <console.h>
+#include <cpio.h>
+#include <elf.h>
+#include <pager.h>
+#include <root.h>
+#include <syscall.h>
+
+#include <stddef.h>
 #include <stdint.h>
 
-#define SYS_EXIT 0
-#define SYS_CALL 4
-#define SYS_REPLY_RECV 5
-#define SERVER_TID 0
+// mlibc __mlibc_mutex layout: the futex word is the first 4 bytes of the
+// pthread_mutex_t, owner bits are 0..29 and the waiters bit is bit 31.
+#define MUTEX_OWNER        0x01020304u
+#define MUTEX_WAITERS_BIT  (1u << 31)
 
-#define N_WARMUP 100
-#define N_ITER   1000
+void root_main(uint64_t arg) {
+    (void)arg;
 
-static inline uint64_t sys_exit(uint64_t a1, uint64_t a2, uint64_t a3) {
-    register uint64_t rax asm("rax") = SYS_EXIT;
-    asm volatile("syscall"
-        : "+a"(rax)
-        : "D"(a1), "S"(a2), "d"(a3) // a3 -> rdx
-        : "rcx", "r11", "memory");
-    return rax;
-}
+    struct root_boot *boot = (struct root_boot *)ROOT_BOOT_VA;
 
-static inline uint64_t rdtsc(void) {
-    uint32_t lo, hi;
-    asm volatile("lfence; rdtsc; lfence" : "=a"(lo), "=d"(hi));
-    return ((uint64_t)hi << 32) | lo;
-}
+    pager_init(boot->self_tid, boot->frame_count);
 
-static inline uint64_t sys_call(uint64_t target, const uint64_t w[5], uint64_t r[5]) {
-    register uint64_t wo0 asm("rdi") = target;
-    register uint64_t wo1 asm("rsi") = w[0];
-    register uint64_t wo2 asm("rdx") = w[1];
-    register uint64_t wo3 asm("r10") = w[2];
-    register uint64_t wo4 asm("r8")  = w[3];
-    register uint64_t r9_ asm("r9")  = w[4];
-    register uint64_t rax asm("rax") = SYS_CALL;
-    asm volatile("syscall"
-        : "+a"(rax), "+D"(wo0), "+S"(wo1), "+d"(wo2), "+r"(wo3), "+r"(wo4)
-        : "r"(r9_)
-        : "rcx", "r11", "memory");
-    r[0]=wo0; r[1]=wo1; r[2]=wo2; r[3]=wo3; r[4]=wo4;
-    return rax; // responder tid
-}
+    log_str("[root] tid=");
+    log_ulong(boot->self_tid);
+    log_str("\n");
 
-static inline uint64_t sys_reply_recv(const uint64_t reply[5], uint64_t r[5]) {
-    register uint64_t wo0 asm("rdi") = reply[0];
-    register uint64_t wo1 asm("rsi") = reply[1];
-    register uint64_t wo2 asm("rdx") = reply[2];
-    register uint64_t wo3 asm("r10") = reply[3];
-    register uint64_t wo4 asm("r8")  = reply[4];
-    register uint64_t rax asm("rax") = SYS_REPLY_RECV;
-    asm volatile("syscall"
-        : "+a"(rax), "+D"(wo0), "+S"(wo1), "+d"(wo2), "+r"(wo3), "+r"(wo4)
-        : : "rcx", "r11", "memory");
-    r[0]=wo0; r[1]=wo1; r[2]=wo2; r[3]=wo3; r[4]=wo4;
-    return rax; // sender tid
-}
+    log_str("[root] pool ");
+    log_ulong(boot->pool_bytes);
+    log_str(" bytes / ");
+    log_ulong(boot->frame_count);
+    log_str(" frames\n");
 
-__attribute__((section("entry")))
-void _start(uint64_t arg) {
-    if (arg == 0) {
-        uint64_t w[5], ack[5] = { 0, 0, 0, 0, 0 };
-        for (;;) {
-            sys_reply_recv(ack, w); // reply to caller
-            ack[0] = w[0] ^ 0xA5A5;
-        }
-    } else {
-        uint64_t deltas[N_ITER];
-        uint64_t min = UINT64_MAX, sum = 0;
+    log_str("[root] initrd ");
+    log_hex(boot->initrd.addr);
+    log_str(" size=");
+    log_ulong(boot->initrd.size);
+    log_str("\n");
 
-        uint64_t msg[5] = { 0xDEADBEEF, 1, 2, 3, 4 };
-        uint64_t r[5];
-
-        for (int i = 0; i < N_ITER; i++) {
-            uint64_t t0 = rdtsc();
-            sys_call(SERVER_TID, msg, r);
-            uint64_t t1 = rdtsc();
-            deltas[i] = t1 - t0;
-            if (deltas[i] < min) min = deltas[i];
-            sum += deltas[i];
-        }
-
-        for (int i = 1; i < N_ITER; i++) {
-            uint64_t key = deltas[i];
-            int j = i - 1;
-            while (j >= 0 && deltas[j] > key) { deltas[j + 1] = deltas[j]; j--; }
-            deltas[j + 1] = key;
-        }
-        uint64_t median = deltas[N_ITER / 2];
-        uint64_t avg    = sum / N_ITER;
-
-        sys_exit(min, median, avg); // cycles
+    if (boot->initrd.addr == 0 || boot->initrd.size == 0) {
+        log_str("[root] no initrd\n");
+        serve(0);
     }
-    
+
+    uint64_t elf_base;
+    size_t elf_size;
+    if (cpio_extract((void *)boot->initrd.addr, "child.elf", &elf_base, &elf_size) != 0) {
+        log_str("[root] child.elf not found\n");
+        serve(0);
+    }
+
+    log_str("[root] child.elf ");
+    log_hex(elf_base);
+    log_str(" size=");
+    log_ulong(elf_size);
+    log_str("\n");
+
+    const uint8_t *elf = (const uint8_t *)elf_base;
+
+    if (elf_check(elf, elf_size) != 0) {
+        log_str("[root] bad elf\n");
+        serve(0);
+    }
+
+    const struct elf64_ehdr *ehdr = (const struct elf64_ehdr *)elf;
+
+    long child = syscall0(SYS_CREATE);
+    if (child <= 0) {
+        log_str("[root] child create failed\n");
+        serve(0);
+    }
+
+    log_str("[root] child tid=");
+    log_ulong((uint64_t)child);
+    log_str("\n");
+
+    const struct elf64_phdr *phdr = (const struct elf64_phdr *)(elf + ehdr->e_phoff);
+    for (uint16_t i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type != PT_LOAD) continue;
+
+        struct elf64_phdr ph = phdr[i];
+
+        while (i + 1 < ehdr->e_phnum &&
+               phdr[i + 1].p_type == PT_LOAD &&
+               phdr[i + 1].p_flags == ph.p_flags &&
+               phdr[i + 1].p_vaddr == ph.p_vaddr + ph.p_memsz &&
+               phdr[i + 1].p_offset == ph.p_offset + ph.p_filesz) {
+            ph.p_memsz  = phdr[i + 1].p_vaddr + phdr[i + 1].p_memsz - ph.p_vaddr;
+            ph.p_filesz = phdr[i + 1].p_offset + phdr[i + 1].p_filesz - ph.p_offset;
+            i++;
+        }
+
+        if (load_segment((uint64_t)child, elf, &ph) != 0) {
+            log_str("[root] segment load failed\n");
+            serve((uint64_t)child);
+        }
+    }
+
+    if (map_stack((uint64_t)child) != 0) {
+        log_str("[root] stack map failed\n");
+        serve((uint64_t)child);
+    }
+
+    if (map_shared((uint64_t)child) != 0) {
+        log_str("[root] shared map failed\n");
+        serve((uint64_t)child);
+    }
+
+    if (syscall4(SYS_START, (uint64_t)child, ehdr->e_entry, boot->self_tid, 0) != 0) {
+        log_str("[root] child start failed\n");
+        serve((uint64_t)child);
+    }
+
+    log_str("[root] child started\n");
+
+    // Lock the shared mutex up-front. The child blocks on it (through mlibc's
+    // futex wait) until we are ready to serve its next heap request.
+    volatile uint32_t *mutex_state = (volatile uint32_t *)SHARED_VA;
+    *mutex_state = MUTEX_OWNER;
+
+    serve((uint64_t)child);
+
+    while (!(*mutex_state & MUTEX_WAITERS_BIT)) ;
+    *mutex_state = 0;
+    syscall2(SYS_FUTEX_WAKE, SHARED_VA, 1);
+
+    serve((uint64_t)child);
+
     for (;;);
 }

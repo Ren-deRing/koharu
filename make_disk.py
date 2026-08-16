@@ -7,6 +7,7 @@ import shutil
 build_dir = sys.argv[1]
 source_dir = sys.argv[2]
 init_elf_path = sys.argv[3]
+child_elf_path = sys.argv[4]
 
 initrd_dir = os.path.join(source_dir, "initrd")
 os.makedirs(initrd_dir, exist_ok=True)
@@ -17,6 +18,7 @@ if os.path.exists(initrd_stage):
 shutil.copytree(os.path.join(source_dir, "initrd"), initrd_stage)
 
 shutil.copy(init_elf_path, os.path.join(initrd_stage, "init.elf"))
+shutil.copy(child_elf_path, os.path.join(initrd_stage, "child.elf"))
 
 initrd_cpio_path = os.path.join(build_dir, "initrd.cpio")
 subprocess.run(f"cd {initrd_stage} && find . -mindepth 1 -printf '%P\\n' | cpio -o -H newc > {initrd_cpio_path}", shell=True, check=True)

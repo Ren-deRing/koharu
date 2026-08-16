@@ -7,7 +7,7 @@ subdir('user')
 build_disk_script = find_program('python3')
 
 disk_img = custom_target('disk.img',
-  input: [bootloader_efi, kernel_elf, init_elf],
+  input: [bootloader_efi, kernel_elf, init_elf, child_elf],
   output: 'disk.img',
   console: true,
   command: [
@@ -16,6 +16,7 @@ disk_img = custom_target('disk.img',
     meson.current_build_dir(),
     meson.current_source_dir(),
     init_elf.full_path(),
+    child_elf.full_path(),
   ]
 )
 

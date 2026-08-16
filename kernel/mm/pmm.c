@@ -203,6 +203,7 @@ int pmm_init() {
     for (uint64_t i = 0; i < count; i++) {
         if (mmap[i].type == MMAP_TYPE_USABLE) {
             uintptr_t curr = ALIGN_UP(mmap[i].phys_start, PAGE_SIZE);
+            if (curr < 0x100000ULL) curr = 0x100000ULL; // low 1MB reserved
             uintptr_t end = ALIGN_DOWN(mmap[i].phys_start + mmap[i].length, PAGE_SIZE);
 
             while (curr < end) {

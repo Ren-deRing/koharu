@@ -8,7 +8,8 @@ syscall_entry:
     
     // save user rsp & switch to kstack
     movq %rsp, %gs:CPU_USER_SP_OFFSET
-    movq %gs:CPU_KSTACK_TOP_OFFSET, %rsp 
+    movq %gs:CPU_KSTACK_TOP_OFFSET, %rsp
+    pushq %gs:CPU_USER_SP_OFFSET // user rsp (deepest)
 
     pushq %r11          // rflags
     pushq %rcx          // rip
@@ -52,7 +53,7 @@ syscall_entry:
     popq %r11           // rflags -> r11
 
     // restore user rsp
-    movq %gs:CPU_USER_SP_OFFSET, %rsp
+    popq %rsp
 
     swapgs
 

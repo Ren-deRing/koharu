@@ -1,4 +1,5 @@
 #include <koharu/cpu.h>
+#include <koharu/futex.h>
 #include <koharu/grant.h>
 #include <koharu/mmu.h>
 #include <koharu/pmap.h>
@@ -42,7 +43,7 @@ uint64_t do_syscall(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, uint64_
             struct thread *cur    = curcpu->current;
             struct thread *target = thread_lookup(a1);
             if (!target) return (uint64_t)-1;
-            if (a1 != cur->tid && cur->pager_tid != a1) return (uint64_t)-1;
+            if (target->pager_tid != cur->tid) return (uint64_t)-1;
             if (a4 == 0) return (uint64_t)-1;
 
             uint8_t rights = 0;
@@ -65,7 +66,7 @@ uint64_t do_syscall(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, uint64_
             struct thread *cur    = curcpu->current;
             struct thread *target = thread_lookup(a1);
             if (!target) return (uint64_t)-1;
-            if (a1 != cur->tid && cur->pager_tid != a1) return (uint64_t)-1;
+            if (target->pager_tid != cur->tid) return (uint64_t)-1;
             if (a3 == 0) return (uint64_t)-1;
 
             for (uintptr_t va = a2 & ~0xFFFULL; va < a2 + a3; va += PAGE_SIZE) {
@@ -145,6 +146,12 @@ uint64_t do_syscall(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, uint64_
             uint64_t sender = ipc_reply_recv(reply, out);
             for (int i = 0; i < IPC_MSG_WORDS; i++) ret->extra[i] = out[i];
             return sender;
+        }
+        case SYS_FUTEX_WAIT: {
+            return (uint64_t)futex_wait((void *)a1, (uint32_t)a2);
+        }
+        case SYS_FUTEX_WAKE: {
+            return (uint64_t)futex_wake((void *)a1, (int)a2);
         }
         default:
             break;

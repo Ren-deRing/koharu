@@ -49,6 +49,8 @@ struct thread {
 
     uint64_t            ipc_msg[IPC_MSG_WORDS]; // pending send / received msg
     uint64_t            ipc_sender;             // sender tid of received msg
+    uint64_t            ipc_prev_seq;           // call seq of last received call (0 = plain send)
+    uint64_t            ipc_call_seq;           // outgoing call counter, one token per ipc_call
 
     uint64_t            pager_tid;
 };
