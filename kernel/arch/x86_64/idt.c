@@ -6,6 +6,7 @@
 #include <idt.h>
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
     uint16_t isr_low;
@@ -41,6 +42,17 @@ void isr_handler(struct trapframe *tf) {
     dprintf("  RCX:     0x%016lx  RDX: 0x%016lx\n", tf->rcx, tf->rdx);
     dprintf("  RSP:     0x%016lx  RBP: 0x%016lx\n", tf->rsp, tf->rbp);
     dprintf("  RFLAGS:  0x%016lx\n", tf->rflags);
+
+    if (tf->vector == 14) {
+        uint64_t err = tf->error;
+        char *cause = (err & 0x2) ? "Write" : "Read";  // write or read
+        char *priv  = (err & 0x4) ? "User" : "Kernel"; // user  or kernel
+        char *type  = (err & 0x10) ? "Instruction" : "Data";
+
+        uint64_t addr;
+        asm volatile ("mov %%cr2, %0" : "=r"(addr));
+        dprintf("\nPF:: [%s] Mode [%s] [%s] Access to [0x%016lx] failed\n", priv, cause, type, addr);
+    }
 
     if (tf->vector != 3) {
         dprintf("oh no, halting.\n");
