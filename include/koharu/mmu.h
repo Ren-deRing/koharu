@@ -2,6 +2,7 @@
 
 #include <koharu/list.h>
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #define PROT_NONE   0x00
@@ -25,6 +26,7 @@
 #define ALIGN_DOWN(addr, align) ((addr) & ~((align) - 1))
 
 #define HHDM_OFFSET 0xFFFF800000000000ULL
+#define PMM_POOL_START_PFN (0x8000ULL)
 
 typedef struct {
     list_node page_list;
@@ -34,6 +36,8 @@ typedef struct {
 
 void* pmm_alloc_pages(int order);
 void pmm_free_pages(void* addr, int order);
+
+bool pmm_frame_in_pool(uint64_t pfn);
 
 uintptr_t virt_to_phys(void *addr);
 void* phys_to_virt(uintptr_t phys);

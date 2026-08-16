@@ -131,6 +131,30 @@ void pmm_free_pages(void* addr, int order) {
     g_pmm.free_pages += (1ULL << order);
 }
 
+bool pmm_frame_in_pool(uint64_t pfn) {
+    if (pfn < PMM_POOL_START_PFN) return false;
+
+    uintptr_t phys = pfn_to_phys(pfn);
+    if (phys < 0x100000ULL) return false;
+
+    if (phys >= g_pmm.mem_map_phys && phys < g_pmm.mem_map_phys + g_pmm.mem_map_size)
+        return false;
+
+    mmap_entry_t *mmap = g_boot_info->memory.entries;
+    for (uint32_t i = 0; i < g_boot_info->memory.count; i++) {
+        if (mmap[i].type != MMAP_TYPE_USABLE) continue;
+
+        uintptr_t start = ALIGN_UP(mmap[i].phys_start, PAGE_SIZE);
+        uintptr_t end   = ALIGN_DOWN(mmap[i].phys_start + mmap[i].length, PAGE_SIZE);
+        if (start < 0x100000ULL) start = 0x100000ULL;
+        if (end <= start) continue;
+
+        if (phys >= start && phys + PAGE_SIZE <= end) return true;
+    }
+
+    return false;
+}
+
 int pmm_init() {
     g_pmm.free_pages = 0;
     
@@ -174,12 +198,19 @@ int pmm_init() {
 
     uintptr_t array_end = array_phys + array_size;
 
+    uintptr_t pool_start = (uintptr_t)PMM_POOL_START_PFN << PAGE_SHIFT;
+
     for (uint64_t i = 0; i < count; i++) {
         if (mmap[i].type == MMAP_TYPE_USABLE) {
             uintptr_t curr = ALIGN_UP(mmap[i].phys_start, PAGE_SIZE);
             uintptr_t end = ALIGN_DOWN(mmap[i].phys_start + mmap[i].length, PAGE_SIZE);
 
             while (curr < end) {
+                if (curr >= pool_start) { // leave frames
+                    curr = end;
+                    break;
+                }
+
                 if (curr >= array_phys && curr < array_end) { // if curr is in a mem map array
                     curr = array_end;
                     continue;
@@ -187,6 +218,7 @@ int pmm_init() {
 
                 uintptr_t limit = end;
                 if (curr < array_phys && end > array_phys) limit = array_phys; // don't overlap me..
+                if (limit > pool_start) limit = pool_start;
 
                 size_t remain = limit - curr;
                 int target_order = 0; // zerokara
