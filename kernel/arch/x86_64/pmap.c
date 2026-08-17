@@ -80,6 +80,8 @@ pmap_t* pmap_create(void) {
     pmap_t *pmap = kmalloc(sizeof(pmap_t)); // allocate new pmap
     if (!pmap) return NULL;
 
+    spin_lock_init(&pmap->lock);
+
     uintptr_t pml4_phys = (uintptr_t)pmm_alloc_pages(0); // allocate new phys page
     pml4e_t *pml4_virt = (pml4e_t*)phys_to_virt(pml4_phys);
 
@@ -226,27 +228,32 @@ static size_t pmap_unmap_page(pmap_t *pmap, uintptr_t va, bool *freed) {
 int pmap_map(pmap_t *pmap, uintptr_t virt, uintptr_t phys, size_t size, uint32_t flags) {
     if (!pmap || size == 0) return -1;
 
+    uint64_t f = spin_lock_irqsave(&pmap->lock);
+
     size_t step = (flags & PROT_HUGE) ? PAGE_SIZE_HUGE : PAGE_SIZE;
     uintptr_t mask = step - 1;
 
-    uintptr_t va_start = virt & ~mask;                 // 4KB align down (page's start addr)
-    uintptr_t va_end = (virt + size + mask) & ~mask;   // 4KB align up   (end boundary addr for loop)
-    uintptr_t pa = phys & ~mask;                       // 4KB align down (phys page's start addr)                     
+    uintptr_t va_start = virt & ~mask;
+    uintptr_t va_end = (virt + size + mask) & ~mask;
+    uintptr_t pa = phys & ~mask;
 
     for (uintptr_t va = va_start; va < va_end; va += step, pa += step) {
-        int err = pmap_map_page(pmap, va, pa, flags);   
-        if (err != 0) return err;
+        int err = pmap_map_page(pmap, va, pa, flags);
+        if (err != 0) { spin_unlock_irqrestore(&pmap->lock, f); return err; }
     }
 
     if (read_cr3() == pmap->pm_root_phys) {
         flush_tlb_all();
     }
 
+    spin_unlock_irqrestore(&pmap->lock, f);
     return 0;
 }
 
 void pmap_unmap(pmap_t *pmap, uintptr_t virt, size_t size) {
     if (!pmap || size == 0) return;
+
+    uint64_t f = spin_lock_irqsave(&pmap->lock);
 
     uintptr_t va_start = virt & ~0xFFFULL;
     uintptr_t va_end   = (virt + size + 0xFFF) & ~0xFFFULL;
@@ -260,38 +267,46 @@ void pmap_unmap(pmap_t *pmap, uintptr_t virt, size_t size) {
     if (freed && read_cr3() == pmap->pm_root_phys) {
         flush_tlb_all();
     }
+
+    spin_unlock_irqrestore(&pmap->lock, f);
 }
 
 uintptr_t pmap_extract(pmap_t *pmap, uintptr_t va) {
     if (!pmap) return 0;
 
+    uint64_t f = spin_lock_irqsave(&pmap->lock);
+
     pml4e_t *pml4 = (pml4e_t *)pmap->pm_root_virt;
 
     // PML4 -> PDPT
     size_t l4 = PML4_INDEX(va);
-    if (!(pml4[l4] & PTE_PRESENT)) return 0;
+    if (!(pml4[l4] & PTE_PRESENT)) { spin_unlock_irqrestore(&pmap->lock, f); return 0; }
     pdpte_t *pdpt = (pdpte_t *)phys_to_virt(pml4[l4] & PTE_ADDR_MASK);
 
     // PDPT -> PD
     size_t l3 = PDPT_INDEX(va);
-    if (!(pdpt[l3] & PTE_PRESENT)) return 0;
+    if (!(pdpt[l3] & PTE_PRESENT)) { spin_unlock_irqrestore(&pmap->lock, f); return 0; }
     pde_t *pd = (pde_t *)phys_to_virt(pdpt[l3] & PTE_ADDR_MASK);
 
     // HUGE page
     size_t l2 = PD_INDEX(va);
-    if (!(pd[l2] & PTE_PRESENT)) return 0;
+    if (!(pd[l2] & PTE_PRESENT)) { spin_unlock_irqrestore(&pmap->lock, f); return 0; }
 
     if (pd[l2] & PDE_HUGE) {
-        return (pd[l2] & 0x000FFFFFFFE00000ULL) + (va & 0x1FFFFF);
+        uintptr_t result = (pd[l2] & 0x000FFFFFFFE00000ULL) + (va & 0x1FFFFF);
+        spin_unlock_irqrestore(&pmap->lock, f);
+        return result;
     }
 
     // normal page
     pte_t *pt = (pte_t *)phys_to_virt(pd[l2] & PTE_ADDR_MASK);
 
     size_t l1 = PT_INDEX(va);
-    if (!(pt[l1] & PTE_PRESENT)) return 0;
+    if (!(pt[l1] & PTE_PRESENT)) { spin_unlock_irqrestore(&pmap->lock, f); return 0; }
 
-    return (pt[l1] & PTE_ADDR_MASK) + (va & 0xFFF);
+    uintptr_t result = (pt[l1] & PTE_ADDR_MASK) + (va & 0xFFF);
+    spin_unlock_irqrestore(&pmap->lock, f);
+    return result;
 }
 
 void pmap_destroy(pmap_t *pmap) {
@@ -341,6 +356,7 @@ int pmap_init(void) {
     pml4e_t *pml4_virt = (pml4e_t*)phys_to_virt(pml4_phys);
     memset(pml4_virt, 0, PAGE_SIZE);
 
+    spin_lock_init(&g_kernel_pmap.lock);
     g_kernel_pmap.pm_root_phys = pml4_phys;
     g_kernel_pmap.pm_root_virt = pml4_virt;
 

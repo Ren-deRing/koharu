@@ -2,6 +2,7 @@
 #include <koharu/futex.h>
 #include <koharu/initcall.h>
 #include <koharu/kmem.h>
+#include <koharu/lock.h>
 #include <koharu/mmu.h>
 #include <koharu/pmap.h>
 #include <koharu/sched.h>
@@ -22,6 +23,7 @@ struct futex_waitq {
 };
 
 static list_head futex_buckets[FUTEX_BUCKETS];
+static spinlock_t futex_bucket_locks[FUTEX_BUCKETS];
 
 static size_t futex_hash(uintptr_t phys) {
     return (phys >> 2) & (FUTEX_BUCKETS - 1);
@@ -43,37 +45,34 @@ int futex_wait(void *uaddr, uint32_t expected) {
 
     if ((uintptr_t)uaddr & 0x3) return -EINVAL;
 
-    cpu_status_t flags = arch_irq_save();
-
     uintptr_t phys = pmap_extract(cur->pmap, (uintptr_t)uaddr);
-    if (!phys) {
-        arch_irq_restore(flags);
-        return -EFAULT;
-    }
+    if (!phys) return -EFAULT;
 
     // value already changed? we are not going to sleep
-    if (*(volatile uint32_t *)phys_to_virt(phys) != expected) {
-        arch_irq_restore(flags);
+    if (*(volatile uint32_t *)phys_to_virt(phys) != expected)
         return -EAGAIN;
-    }
+
+    size_t bucket = futex_hash(phys);
+    uint64_t flags = spin_lock_irqsave(&futex_bucket_locks[bucket]);
 
     struct futex_waitq *wq = futex_find(phys);
     if (!wq) {
         wq = (struct futex_waitq *)kmalloc(sizeof(struct futex_waitq));
         if (!wq) {
-            arch_irq_restore(flags);
+            spin_unlock_irqrestore(&futex_bucket_locks[bucket], flags);
             return -EAGAIN;
         }
 
         wq->phys = phys;
         list_init(&wq->waiters);
-        list_add_tail(&wq->hash_node, &futex_buckets[futex_hash(phys)]);
+        list_add_tail(&wq->hash_node, &futex_buckets[bucket]);
     }
 
     list_add_tail(&cur->futex_list, &wq->waiters);
 
+    spin_unlock_irqrestore(&futex_bucket_locks[bucket], flags);
+
     sched_block();
-    arch_irq_restore(flags);
 
     return 0;
 }
@@ -83,17 +82,15 @@ int futex_wake(void *uaddr, int all) {
 
     if ((uintptr_t)uaddr & 0x3) return -EINVAL;
 
-    cpu_status_t flags = arch_irq_save();
-
     uintptr_t phys = pmap_extract(cur->pmap, (uintptr_t)uaddr);
-    if (!phys) {
-        arch_irq_restore(flags);
-        return -EFAULT;
-    }
+    if (!phys) return -EFAULT;
+
+    size_t bucket = futex_hash(phys);
+    uint64_t flags = spin_lock_irqsave(&futex_bucket_locks[bucket]);
 
     struct futex_waitq *wq = futex_find(phys);
     if (!wq) {
-        arch_irq_restore(flags);
+        spin_unlock_irqrestore(&futex_bucket_locks[bucket], flags);
         return 0;
     }
 
@@ -109,19 +106,21 @@ int futex_wake(void *uaddr, int all) {
         if (!all) break;
     }
 
-    if (list_empty(&wq->waiters)) { // last waiter gone.. release the waitq
+    if (list_empty(&wq->waiters)) {
         list_del(&wq->hash_node);
         kfree(wq);
     }
 
-    arch_irq_restore(flags);
+    spin_unlock_irqrestore(&futex_bucket_locks[bucket], flags);
 
     return woken;
 }
 
 static int futex_init(void) {
-    for (size_t i = 0; i < FUTEX_BUCKETS; i++)
+    for (size_t i = 0; i < FUTEX_BUCKETS; i++) {
         list_init(&futex_buckets[i]);
+        spin_lock_init(&futex_bucket_locks[i]);
+    }
 
     return 0;
 }

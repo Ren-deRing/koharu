@@ -1,6 +1,7 @@
 #pragma once
 
 #include <koharu/list.h>
+#include <koharu/lock.h>
 
 #include <stddef.h>
 #include <stdint.h>
@@ -9,6 +10,7 @@ typedef struct pmap {
     void *pm_root_virt;
     uintptr_t pm_root_phys;
     list_node grant_list;
+    spinlock_t lock;
 } pmap_t;
 
 pmap_t* pmap_kernel(void);

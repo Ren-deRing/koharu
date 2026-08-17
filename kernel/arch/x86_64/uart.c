@@ -1,4 +1,5 @@
 #include <koharu/initcall.h>
+#include <koharu/lock.h>
 #include <koharu/print.h>
 
 #include <io.h>
@@ -8,12 +9,15 @@
 #include <stdbool.h>
 
 bool initialized = false;
+static spinlock_t uart_lock = SPINLOCK_INITIALIZER;
 
 void uart_putc(char c) {
     if (!initialized) return;
-    while ((inb(SERIAL_UART + 5) & 0x20) == 0); // waiting for ready....
-    
-    outb(0x3F8, c); // write!
+
+    uint64_t flags = spin_lock_irqsave(&uart_lock);
+    while ((inb(SERIAL_UART + 5) & 0x20) == 0);
+    outb(0x3F8, c);
+    spin_unlock_irqrestore(&uart_lock, flags);
 }
 
 int uart_init() {

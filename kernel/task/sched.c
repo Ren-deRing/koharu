@@ -5,9 +5,10 @@
 #include <koharu/cpu.h>
 #include <koharu/thread.h>
 
+#include <stdatomic.h>
 #include <stdbool.h>
 
-static uint64_t sched_ticks = 0;
+static _Atomic uint64_t sched_ticks = 0;
 
 static void sched_boost(void) {
     struct thread *cur = curcpu->current;
@@ -62,7 +63,7 @@ void sched_tick(void) {
         }
     }
 
-    if (++sched_ticks % BOOST_PERIOD == 0)
+    if (atomic_fetch_add(&sched_ticks, 1) % BOOST_PERIOD == (BOOST_PERIOD - 1))
         sched_boost();
 
     if (!cur_exhausted) return;

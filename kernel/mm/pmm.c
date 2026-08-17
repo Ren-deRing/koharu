@@ -1,5 +1,6 @@
 #include <koharu/bootinfo.h>
 #include <koharu/cpu.h>
+#include <koharu/lock.h>
 #include <koharu/mmu.h>
 #include <koharu/initcall.h>
 #include <koharu/list.h>
@@ -28,6 +29,7 @@ typedef struct {
 } pmm_t;
 
 static pmm_t g_pmm;
+static spinlock_t g_pmm_lock = SPINLOCK_INITIALIZER;
 
 uintptr_t virt_to_phys(void *addr) {
     return (uintptr_t)addr - HHDM_OFFSET;
@@ -70,24 +72,25 @@ void* page_to_virt(page_t *page) {
 void* pmm_alloc_pages(int order) {
     if (order < 0 || order >= MAX_BUDDY_ORDER) return NULL;
 
+    uint64_t flags = spin_lock_irqsave(&g_pmm_lock);
+
     for (int curr_order = order; curr_order < MAX_BUDDY_ORDER; curr_order++) {
-        if (list_empty(&g_pmm.orders[curr_order].free_list)) continue; // no free block here? continue to higher order
+        if (list_empty(&g_pmm.orders[curr_order].free_list)) continue;
         
-        list_node* node = g_pmm.orders[curr_order].free_list.next; // i think this is fine.
-        list_del(node);                                            // delete from freelist
-        g_pmm.orders[curr_order].free_count--;                     // as you know.
+        list_node* node = g_pmm.orders[curr_order].free_list.next;
+        list_del(node);
+        g_pmm.orders[curr_order].free_count--;
 
         size_t pfn = page_to_pfn((page_t*)node);
 
-        while (curr_order > order) { // if splited?
+        while (curr_order > order) {
             curr_order--;
 
-            size_t buddy_pfn = pfn ^ (1ULL << curr_order); // hey buddy, where are you?
-
-            page_t* buddy = pfn_to_page(buddy_pfn); // oh, there!
+            size_t buddy_pfn = pfn ^ (1ULL << curr_order);
+            page_t* buddy = pfn_to_page(buddy_pfn);
             buddy->is_free = true;
 
-            list_add(&buddy->page_list, &g_pmm.orders[curr_order].free_list); // add to freelist..
+            list_add(&buddy->page_list, &g_pmm.orders[curr_order].free_list);
             g_pmm.orders[curr_order].free_count++;
         }
 
@@ -96,39 +99,44 @@ void* pmm_alloc_pages(int order) {
 
         g_pmm.free_pages -= (1ULL << order);
 
-        return (void*)pfn_to_phys(pfn); // return phys addr
+        spin_unlock_irqrestore(&g_pmm_lock, flags);
+        return (void*)pfn_to_phys(pfn);
     }
 
-    return NULL; // OOM!
+    spin_unlock_irqrestore(&g_pmm_lock, flags);
+    return NULL;
 }
 
 void pmm_free_pages(void* addr, int order) {
     if (addr == NULL || order < 0 || order >= MAX_BUDDY_ORDER) return;
 
+    uint64_t flags = spin_lock_irqsave(&g_pmm_lock);
+
     size_t pfn = phys_to_pfn((uintptr_t)addr);
     int curr_order = order;
 
     while (curr_order < MAX_BUDDY_ORDER - 1) {
-        size_t buddy_pfn = pfn ^ (1ULL << curr_order); // hey ~~~
-        page_t* buddy = pfn_to_page(buddy_pfn); // oh, ~~~~
+        size_t buddy_pfn = pfn ^ (1ULL << curr_order);
+        page_t* buddy = pfn_to_page(buddy_pfn);
 
-        if (!buddy->is_free) break; // buddy is not free
+        if (!buddy->is_free) break;
 
         list_del(&buddy->page_list);
         buddy->is_free = false;
         g_pmm.orders[curr_order].free_count--;
 
-        pfn = pfn & buddy_pfn; // merge!
+        pfn = pfn & buddy_pfn;
         curr_order++;
     }
 
-    // add merged page to list
     page_t* page = pfn_to_page(pfn);
     page->is_free = true;
     list_add_tail(&page->page_list, &g_pmm.orders[curr_order].free_list);
     g_pmm.orders[curr_order].free_count++;
 
     g_pmm.free_pages += (1ULL << order);
+
+    spin_unlock_irqrestore(&g_pmm_lock, flags);
 }
 
 bool pmm_frame_in_pool(uint64_t pfn) {
