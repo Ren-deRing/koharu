@@ -3,6 +3,7 @@
 #include <root.h>
 #include <syscall.h>
 #include <vma.h>
+#include <console.h>
 
 #include <stddef.h>
 #include <string.h>
@@ -98,6 +99,23 @@ int map_shared(uint64_t child) {
     return 0;
 }
 
+int map_utcb(uint64_t child, uint64_t child_tid, uint64_t pager_tid) {
+    uint64_t pfn;
+    if (pool_alloc(&pfn) != 0) return -1;
+    uint64_t phys = pfn << 12;
+
+    if (frame_zero(phys) != 0) return -1;
+    if (map_page(child, UTBC_VA, phys, PROT_READ | PROT_WRITE) != 0) return -1;
+
+    uint64_t *utcb = (uint64_t *)SCRATCH_VA;
+    if (map_page(self_tid, SCRATCH_VA, phys, PROT_READ | PROT_WRITE) != 0) return -1;
+    utcb[0] = child_tid;
+    utcb[1] = pager_tid;
+    syscall3(SYS_UNMAP, self_tid, SCRATCH_VA, PAGE_SIZE);
+
+    return 0;
+}
+
 int map_stack(uint64_t child) {
     uint64_t bottom = CHILD_STACK_TOP - CHILD_STACK_SIZE;
 
@@ -127,7 +145,15 @@ void serve(uint64_t child) {
 
         if (sender <= 0 || child == 0) continue;
 
-        if (msg[0] == KOHARU_REQ_READY) return;
+        if (msg[0] == KOHARU_REQ_READY) {
+            log_str("[root] child ready\n");
+            continue;
+        }
+
+        if (msg[0] == KOHARU_REQ_EXIT) {
+            log_str("[root] child exited\n");
+            return;
+        }
 
         if (msg[0] == KOHARU_REQ_ALLOC || msg[0] == KOHARU_REQ_MAP) {
             uint64_t pages = (msg[1] + PAGE_SIZE - 1) >> 12;

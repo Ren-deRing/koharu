@@ -50,9 +50,11 @@ struct thread {
     uint64_t            ipc_msg[IPC_MSG_WORDS]; // pending send / received msg
     uint64_t            ipc_sender;             // sender tid of received msg
     uint64_t            ipc_prev_seq;           // call seq of last received call (0 = plain send)
-    uint64_t            ipc_call_seq;           // outgoing call counter, one token per ipc_call
+    uint64_t            ipc_call_seq;           // call counter, one token per ipc_call
 
     uint64_t            pager_tid;
+    uintptr_t           utcb;                   // UTCB address
+    uint64_t            exception_pager_tid;    // exception handler thread
 };
 
 void switch_to(struct thread *prev, struct thread *next);
@@ -61,6 +63,7 @@ void user_trampoline();
 
 struct thread *thread_create(pmap_t *pmap, uintptr_t entry, void *arg, uint32_t affinity);
 struct thread *thread_create_child(pmap_t *pmap, uintptr_t entry);
+void thread_destroy(struct thread *t);
 void thread_exit(void);
 
 struct thread *thread_lookup(uint64_t tid);

@@ -43,7 +43,7 @@ void syscall_dispatch(struct trapframe *regs) {
     struct syscall_ret ret;
     uint64_t num = regs->rax;
     regs->rax = do_syscall(num, regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8, regs->r9, &ret);
-    if (num == SYS_RECV || num == SYS_CALL || num == SYS_REPLY_RECV) {
+    if (num == SYS_IPC) {
         regs->rdi = ret.extra[0]; regs->rsi = ret.extra[1]; regs->rdx = ret.extra[2];
         regs->r10 = ret.extra[3]; regs->r8  = ret.extra[4];
     }

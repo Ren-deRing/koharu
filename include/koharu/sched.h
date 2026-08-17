@@ -13,6 +13,7 @@ void sched_yield(void);
 void sched_tick(void);
 void sched_boot(void);
 void sched_enqueue(struct thread *t);
+void sched_dequeue(struct thread *t);
 
 void sched_block(void);
 void sched_exit(void);

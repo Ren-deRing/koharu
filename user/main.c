@@ -8,11 +8,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// mlibc __mlibc_mutex layout: the futex word is the first 4 bytes of the
-// pthread_mutex_t, owner bits are 0..29 and the waiters bit is bit 31.
-#define MUTEX_OWNER        0x01020304u
-#define MUTEX_WAITERS_BIT  (1u << 31)
-
 void root_main(uint64_t arg) {
     (void)arg;
 
@@ -63,7 +58,7 @@ void root_main(uint64_t arg) {
 
     const struct elf64_ehdr *ehdr = (const struct elf64_ehdr *)elf;
 
-    long child = syscall0(SYS_CREATE);
+    long child = syscall5(SYS_THREAD_CONTROL, TC_CREATE, 0, 0, boot->self_tid, 0);
     if (child <= 0) {
         log_str("[root] child create failed\n");
         serve(0);
@@ -105,23 +100,21 @@ void root_main(uint64_t arg) {
         serve((uint64_t)child);
     }
 
-    if (syscall4(SYS_START, (uint64_t)child, ehdr->e_entry, boot->self_tid, 0) != 0) {
+    if (map_utcb((uint64_t)child, (uint64_t)child, boot->self_tid) != 0) {
+        log_str("[root] utcb map failed\n");
+        serve((uint64_t)child);
+    }
+
+    if (syscall5(SYS_EXCHANGE_REGISTERS, (uint64_t)child, ehdr->e_entry, UTBC_VA, UTBC_VA, EXR_SET_ENTRY) != 0) {
+        log_str("[root] child register write failed\n");
+        serve((uint64_t)child);
+    }
+    if (syscall5(SYS_EXCHANGE_REGISTERS, (uint64_t)child, 0, 0, 0, EXR_ACTIVATE) != 0) {
         log_str("[root] child start failed\n");
         serve((uint64_t)child);
     }
 
     log_str("[root] child started\n");
-
-    // Lock the shared mutex up-front. The child blocks on it (through mlibc's
-    // futex wait) until we are ready to serve its next heap request.
-    volatile uint32_t *mutex_state = (volatile uint32_t *)SHARED_VA;
-    *mutex_state = MUTEX_OWNER;
-
-    serve((uint64_t)child);
-
-    while (!(*mutex_state & MUTEX_WAITERS_BIT)) ;
-    *mutex_state = 0;
-    syscall2(SYS_FUTEX_WAKE, SHARED_VA, 1);
 
     serve((uint64_t)child);
 

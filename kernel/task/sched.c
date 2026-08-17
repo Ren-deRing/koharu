@@ -137,6 +137,10 @@ void sched_enqueue(struct thread *t) {
     list_add_tail(&t->sched_list, &curcpu->runq[0]);
 }
 
+void sched_dequeue(struct thread *t) {
+    list_del(&t->sched_list);
+}
+
 void sched_wakeup(struct thread *t) {
     sched_enqueue(t); // anyway, it's a same thing
 }

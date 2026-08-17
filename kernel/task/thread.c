@@ -35,3 +35,9 @@ int thread_register(struct thread *t) {
     g_threads[t->tid] = t;
     return 0;
 }
+
+void thread_destroy(struct thread *t) {
+    if (!t) return;
+    if (t->tid < g_threads_cap)
+        g_threads[t->tid] = NULL;
+}

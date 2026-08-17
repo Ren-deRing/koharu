@@ -7,6 +7,7 @@
 #define ROOT_INITRD_VA  0x700030000000ULL
 #define SHARED_VA       0x700040000000ULL
 #define SCRATCH_VA      0x710000000000ULL
+#define UTBC_VA         0x7ffffffde000ULL
 
 #define PAGE_SIZE 4096
 
@@ -17,6 +18,7 @@
 #define KOHARU_REQ_ALLOC 1
 #define KOHARU_REQ_READY 2
 #define KOHARU_REQ_MAP   3
+#define KOHARU_REQ_EXIT  4
 
 #define CHILD_STACK_SIZE (128 * 1024)
 #define CHILD_STACK_TOP  0x7ffffffff000ULL
